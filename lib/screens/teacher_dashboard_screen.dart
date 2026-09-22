@@ -319,23 +319,23 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: _dark ? _accentColor.withValues(alpha: 0.14) : Colors.white.withOpacity(0.2),
-              border: Border.all(
-                color: _dark ? _accentColor.withValues(alpha: 0.38) : Colors.white.withOpacity(0.3),
-                width: 1.2,
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: _dark ? _accentColor.withValues(alpha: 0.14) : Colors.white.withOpacity(0.2),
+                border: Border.all(
+                  color: _dark ? _accentColor.withValues(alpha: 0.38) : Colors.white.withOpacity(0.3),
+                  width: 1.2,
+                ),
+              ),
+              child: Icon(
+                Icons.school_rounded,
+                color: _dark ? _accentAForeground : Colors.white,
+                size: 24,
               ),
             ),
-            child: Icon(
-              Icons.school_rounded,
-              color: _dark ? _accentAForeground : Colors.white,
-              size: 24,
-            ),
-          ),
           const SizedBox(width: 13),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,9 +504,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }
 
   List<FaultReport> _reportsForPc(
-      LabWorkstation pc,
-      List<FaultReport> reports,
-      ) {
+    LabWorkstation pc,
+    List<FaultReport> reports,
+  ) {
     final workstationId = pc.workstationId.trim().toLowerCase();
     final pcId = pc.pcId.trim().toLowerCase();
     return reports.where((report) {
@@ -521,7 +521,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final openReports = reports.where((report) => !report.repaired && report.workflowStatus != 'resolved').toList();
     final resolvedReports = reports.where((report) => report.repaired || report.workflowStatus == 'resolved').toList();
     final reportableWorkstations =
-    room.workstations.where((pc) => pc.canReport).toList();
+        room.workstations.where((pc) => pc.canReport).toList();
     final color = _conditionColor(room.maintenanceColor);
 
     return RefreshIndicator(
@@ -547,20 +547,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     child: room.workstations.isEmpty
                         ? _emptyLabMap(room)
                         : Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        for (final pc in room.workstations)
-                          SizedBox(
-                            width: 140,
-                            height: 140,
-                            child: _pcTile(
-                              pc,
-                              _reportsForPc(pc, reports),
-                            ),
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              for (final pc in room.workstations)
+                                SizedBox(
+                                  width: 140,
+                                  height: 140,
+                                  child: _pcTile(
+                                    pc,
+                                    _reportsForPc(pc, reports),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
                   ),
                   const SizedBox(height: 18),
                   _sectionCard(
@@ -583,11 +583,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     child: openReports.isEmpty
                         ? _emptyReports()
                         : Column(
-                      children: [
-                        for (final report in openReports)
-                          _reportCard(report),
-                      ],
-                    ),
+                            children: [
+                              for (final report in openReports)
+                                _reportCard(report),
+                            ],
+                          ),
                   ),
                   if (resolvedReports.isNotEmpty) ...[
                     const SizedBox(height: 18),
@@ -595,7 +595,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                       icon: Icons.history_rounded,
                       title: 'Report History',
                       subtitle:
-                      '${resolvedReports.length} resolved report${resolvedReports.length == 1 ? '' : 's'}. Click any report to view the complete history.',
+                          '${resolvedReports.length} resolved report${resolvedReports.length == 1 ? '' : 's'}. Click any report to view the complete history.',
                       child: Column(
                         children: [
                           for (final report in resolvedReports.take(100))
@@ -1062,11 +1062,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                       const SizedBox(height: 7),
                       Text(
                         'Reported: ${formatDateTime(report.createdAt)}'
-                            '${report.acceptedByName != null ? '\nAccepted by ITSO: ${report.acceptedByName} · ${formatDateTime(report.acceptedAt)}' : ''}'
-                            '${report.handledByName != null ? '\nHandled by ITSO: ${report.handledByName} · ${formatDateTime(report.handledAt)}' : ''}'
-                            '${report.completedByName != null ? '\nCompleted by ITSO: ${report.completedByName} · ${formatDateTime(report.completedAt)}' : ''}'
-                            '${report.repairedAt != null ? '\nITSO Fixed: ${formatDateTime(report.repairedAt)}' : ''}'
-                            '${report.teacherApprovedAt != null ? '\nTeacher Verified: ${formatDateTime(report.teacherApprovedAt)}' : ''}',
+                        '${report.acceptedByName != null ? '\nAccepted by ITSO: ${report.acceptedByName} · ${formatDateTime(report.acceptedAt)}' : ''}'
+                        '${report.handledByName != null ? '\nHandled by ITSO: ${report.handledByName} · ${formatDateTime(report.handledAt)}' : ''}'
+                        '${report.completedByName != null ? '\nCompleted by ITSO: ${report.completedByName} · ${formatDateTime(report.completedAt)}' : ''}'
+                        '${report.repairedAt != null ? '\nITSO Fixed: ${formatDateTime(report.repairedAt)}' : ''}'
+                        '${report.teacherApprovedAt != null ? '\nTeacher Verified: ${formatDateTime(report.teacherApprovedAt)}' : ''}',
                         style: TextStyle(
                           color: _sub,
                           fontSize: 11.2,
@@ -1112,21 +1112,21 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     onPressed: () => _showForwardDialog(report),
                   )
                 else if (report.workflowStatus == 'awaiting_teacher_approval')
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _outlineAction(
-                          label: 'Still Damaged',
-                          icon: Icons.close_rounded,
-                          onPressed: () => _showVerifyDialog(report, false),
-                        ),
-                        _gradientButton(
-                          label: 'PC is OK',
-                          icon: Icons.check_rounded,
-                          onPressed: () => _showVerifyDialog(report, true),
-                        ),
-                      ],
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _outlineAction(
+                        label: 'Still Damaged',
+                        icon: Icons.close_rounded,
+                        onPressed: () => _showVerifyDialog(report, false),
+                      ),
+                      _gradientButton(
+                        label: 'PC is OK',
+                        icon: Icons.check_rounded,
+                        onPressed: () => _showVerifyDialog(report, true),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -1557,7 +1557,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Future<void> _showCreateReport(LabOverview room) async {
     final reportableWorkstations =
-    room.workstations.where((pc) => pc.canReport).toList();
+        room.workstations.where((pc) => pc.canReport).toList();
     if (reportableWorkstations.isEmpty) {
       await _showNoRegisteredPcDialog(room);
       return;
@@ -1582,7 +1582,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             setDialogState(() => saving = true);
             try {
               final selectedPc = reportableWorkstations.firstWhere(
-                    (pc) => pc.workstationId == workstationId,
+                (pc) => pc.workstationId == workstationId,
               );
               final reportId = await TeacherService.instance.createReport(
                 workstationId: workstationId,
@@ -1712,15 +1712,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             onPressed: saving
                                 ? null
                                 : () async {
-                              try {
-                                final picked = await NativeImagePickerService.instance.pickJpgOrPng();
-                                if (picked != null && dialogContext.mounted) {
-                                  setDialogState(() => proofImage = picked);
-                                }
-                              } catch (error) {
-                                if (mounted) _message(cleanError(error));
-                              }
-                            },
+                                    try {
+                                      final picked = await NativeImagePickerService.instance.pickJpgOrPng();
+                                      if (picked != null && dialogContext.mounted) {
+                                        setDialogState(() => proofImage = picked);
+                                      }
+                                    } catch (error) {
+                                      if (mounted) _message(cleanError(error));
+                                    }
+                                  },
                             icon: const Icon(Icons.image_outlined, size: 18),
                             label: Text(proofImage == null ? 'Attach Image' : 'Change'),
                           ),
@@ -1894,15 +1894,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                           onPressed: saving
                               ? null
                               : () async {
-                            try {
-                              final picked = await NativeImagePickerService.instance.pickJpgOrPng();
-                              if (picked != null && dialogContext.mounted) {
-                                setDialogState(() => proofImage = picked);
-                              }
-                            } catch (error) {
-                              if (mounted) _message(cleanError(error));
-                            }
-                          },
+                                  try {
+                                    final picked = await NativeImagePickerService.instance.pickJpgOrPng();
+                                    if (picked != null && dialogContext.mounted) {
+                                      setDialogState(() => proofImage = picked);
+                                    }
+                                  } catch (error) {
+                                    if (mounted) _message(cleanError(error));
+                                  }
+                                },
                           icon: const Icon(Icons.image_outlined, size: 18),
                           label: Text(proofImage == null ? 'Attach' : 'Change'),
                         ),
@@ -2062,7 +2062,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       final s = r.severity.toLowerCase();
       return s == 'high' || s == 'critical' || s == 'emergency';
     }).toList();
-
+    
     final activeReports = pcReports.where((r) {
       final s = r.severity.toLowerCase();
       return s != 'high' && s != 'critical' && s != 'emergency';

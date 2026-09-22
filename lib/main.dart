@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'screens/teacher_login_screen.dart';
+import 'screens/teacher_room_config_dialog.dart';
 import 'services/app_config_service.dart';
 import 'services/teacher_windows_session_service.dart';
 import 'services/theme_service.dart';
@@ -37,13 +39,22 @@ class SysWatchTeacherApp extends StatefulWidget {
 }
 
 class _SysWatchTeacherAppState extends State<SysWatchTeacherApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final FocusNode _shortcutFocusNode = FocusNode(debugLabel: 'TeacherGlobalShortcut');
   late ThemeMode _themeMode;
+  bool _teacherConfigOpen = false;
 
   @override
   void initState() {
     super.initState();
     _themeMode = ThemeService.instance.themeMode;
     ThemeService.instance.addListener(_handleThemeChanged);
+    HardwareKeyboard.instance.addHandler(_handleGlobalKeyEvent);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_shortcutFocusNode.hasFocus) {
+        _shortcutFocusNode.requestFocus();
+      }
+    });
   }
 
   void _handleThemeChanged() {
@@ -53,9 +64,71 @@ class _SysWatchTeacherAppState extends State<SysWatchTeacherApp> {
     setState(() => _themeMode = next);
   }
 
+  bool _handleGlobalKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    final keyboard = HardwareKeyboard.instance;
+    final isA = event.logicalKey == LogicalKeyboardKey.keyA ||
+        event.physicalKey == PhysicalKeyboardKey.keyA;
+    final isConfigShortcut = isA &&
+        keyboard.isControlPressed &&
+        keyboard.isShiftPressed;
+    if (!isConfigShortcut) return false;
+
+    _triggerTeacherRoomConfiguration();
+    return true;
+  }
+
+  void _triggerTeacherRoomConfiguration() {
+    if (_teacherConfigOpen) return;
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _triggerTeacherRoomConfiguration();
+      });
+      return;
+    }
+    unawaited(_openTeacherRoomConfiguration());
+  }
+
+  Future<void> _openTeacherRoomConfiguration() async {
+    if (_teacherConfigOpen) return;
+    final context = _navigatorKey.currentContext;
+    if (context == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _triggerTeacherRoomConfiguration();
+      });
+      return;
+    }
+
+    _teacherConfigOpen = true;
+    try {
+      final saved = await _navigatorKey.currentState?.push<bool>(
+        MaterialPageRoute<bool>(
+          fullscreenDialog: true,
+          builder: (_) => const TeacherRoomConfigDialog(),
+        ),
+      );
+      if (saved != true) return;
+
+      // Force a fresh automatic Teacher login so the newly assigned room is
+      // returned by the server immediately. Windows identity recording stays
+      // active in the background.
+      await AppConfigService.instance.clearSession();
+      if (!mounted) return;
+      _navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const TeacherLoginScreen()),
+        (_) => false,
+      );
+    } finally {
+      _teacherConfigOpen = false;
+    }
+  }
+
   @override
   void dispose() {
     ThemeService.instance.removeListener(_handleThemeChanged);
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKeyEvent);
+    _shortcutFocusNode.dispose();
     TeacherWindowsSessionService.instance.dispose();
     super.dispose();
   }
@@ -63,6 +136,33 @@ class _SysWatchTeacherAppState extends State<SysWatchTeacherApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      builder: (context, child) {
+        return CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(
+              LogicalKeyboardKey.keyA,
+              control: true,
+              shift: true,
+            ): _triggerTeacherRoomConfiguration,
+          },
+          child: Focus(
+            focusNode: _shortcutFocusNode,
+            autofocus: true,
+            onKeyEvent: (node, event) {
+              final keyboard = HardwareKeyboard.instance;
+              final isA = event.logicalKey == LogicalKeyboardKey.keyA ||
+                  event.physicalKey == PhysicalKeyboardKey.keyA;
+              if (isA && keyboard.isControlPressed && keyboard.isShiftPressed) {
+                _triggerTeacherRoomConfiguration();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       title: 'SysWatch Teacher',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,

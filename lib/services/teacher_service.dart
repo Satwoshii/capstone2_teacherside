@@ -20,6 +20,66 @@ class TeacherService {
   // This service contains only Teacher dashboard/actions; there is no Teacher
   // email/password login or first-time linking flow.
 
+
+  /// Authenticates an Admin/Super Admin for the protected Ctrl+Shift+A
+  /// Teacher-room configuration and returns active Teacher accounts and rooms.
+  Future<Map<String, dynamic>> loadRoomConfiguration({
+    required String adminEmail,
+    required String adminPassword,
+  }) async {
+    return ApiClient.instance.postJson(
+      ApiEndpoints.teacherConfigureRoom,
+      authenticated: false,
+      body: {
+        'action': 'load',
+        'admin_email': adminEmail.trim(),
+        'admin_password': adminPassword,
+      },
+    );
+  }
+
+  /// Saves the room used by the selected shared Teacher account. The server
+  /// rechecks the Admin/Super Admin credentials before changing the mapping.
+  /// If the room does not exist yet, the API creates it with [pcCount].
+  Future<Map<String, dynamic>> configureRoom({
+    required String adminEmail,
+    required String adminPassword,
+    required String teacherUid,
+    required String roomName,
+    required int pcCount,
+    Map<String, dynamic>? windowsIdentity,
+  }) async {
+    final body = <String, dynamic>{
+      'action': 'save',
+      'admin_email': adminEmail.trim(),
+      'admin_password': adminPassword,
+      'teacher_uid': teacherUid.trim(),
+      'room_name': roomName.trim(),
+      'pc_count': pcCount,
+    };
+
+    if (windowsIdentity != null) {
+      for (final key in const [
+        'windows_username',
+        'windows_domain',
+        'windows_upn',
+        'windows_sid',
+        'account_identifier',
+        'windows_display_name',
+        'computer_name',
+      ]) {
+        final value = windowsIdentity[key]?.toString().trim() ?? '';
+        if (value.isNotEmpty) body[key] = value;
+      }
+    }
+
+    return ApiClient.instance.postJson(
+      ApiEndpoints.teacherConfigureRoom,
+      authenticated: false,
+      body: body,
+    );
+  }
+
   Future<void> logout() async {
     try {
       if (AppConfigService.instance.apiToken.isNotEmpty) {

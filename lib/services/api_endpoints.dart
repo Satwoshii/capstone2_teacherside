@@ -25,6 +25,9 @@ class ApiEndpoints {
   static const String teacherChatOverview = 'teacher/chat_overview.php';
   static const String teacherChatSend = 'teacher/chat_send.php';
 
+  // Protected Ctrl+Shift+A Teacher room configuration.
+  static const String teacherConfigureRoom = 'teacher/configure_room.php';
+
   // Teacher proof image upload.
   static const String attachmentUpload = 'attachments/upload.php';
 }
