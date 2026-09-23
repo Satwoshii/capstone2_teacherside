@@ -52,7 +52,12 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "capstone2_teacher");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  gtk_window_set_default_size(window, 1390, 696);
+  GdkGeometry geometry;
+  geometry.min_width = 1276;
+  geometry.min_height = 696;
+  gtk_window_set_geometry_hints(window, NULL, &geometry, GDK_HINT_MIN_SIZE);
+  gtk_window_maximize(window);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

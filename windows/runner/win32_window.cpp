@@ -150,7 +150,7 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  return ShowWindow(window_handle_, SW_SHOWMAXIMIZED);
 }
 
 // static
@@ -186,6 +186,16 @@ Win32Window::MessageHandler(HWND hwnd,
         PostQuitMessage(0);
       }
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      LPMINMAXINFO info = reinterpret_cast<LPMINMAXINFO>(lparam);
+      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+      double scale_factor = dpi / 96.0;
+      info->ptMinTrackSize.x = static_cast<LONG>(1390 * scale_factor);
+      info->ptMinTrackSize.y = static_cast<LONG>(696 * scale_factor);
+      return 0;
+    }
 
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);

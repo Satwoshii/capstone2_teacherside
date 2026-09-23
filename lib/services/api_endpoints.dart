@@ -16,7 +16,7 @@ class ApiEndpoints {
   static const String teacherWindowsHeartbeat =
       'staff_sessions/windows_heartbeat.php';
 
-  // Teacher dashboard.
+  // Teacher dashboard & features.
   static const String teacherOverview = 'teacher/overview.php';
   static const String teacherReports = 'teacher/reports.php';
   static const String teacherCreateReport = 'teacher/create_report.php';
@@ -24,6 +24,8 @@ class ApiEndpoints {
   static const String teacherVerifyRepair = 'teacher/verify_repair.php';
   static const String teacherChatOverview = 'teacher/chat_overview.php';
   static const String teacherChatSend = 'teacher/chat_send.php';
+  static const String teacherAttendance = 'teacher/attendance.php';
+  static const String teacherAttendanceLog = 'teacher/attendance_log.php';
 
   // Protected Ctrl+Shift+A Teacher room configuration.
   static const String teacherConfigureRoom = 'teacher/configure_room.php';

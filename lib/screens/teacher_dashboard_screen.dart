@@ -11,6 +11,7 @@ import '../services/teacher_windows_session_service.dart';
 import '../services/native_image_picker_service.dart';
 import '../utils/value_helpers.dart';
 import '../widgets/theme_toggle_button.dart';
+import 'student_attendance_screen.dart';
 import 'teacher_chat_screen.dart';
 
 const _teacherProblemOptions = <_TeacherProblemOption>[
@@ -115,6 +116,7 @@ class TeacherDashboardScreen extends StatefulWidget {
 
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Future<(LabOverview, List<FaultReport>)>? _future;
+  LabOverview? _latestRoom;
   Timer? _timer;
   bool _loggingOut = false;
   final _busyReports = <String>{};
@@ -135,6 +137,23 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Color get _accentBForeground => _dark ? Colors.white : _accentB;
   Color get _errorColor => const Color(0xFFFF6B6B);
   Color get _accentColor => _dark ? _accentA : _accentB;
+
+  // ── Responsive breakpoints ─────────────────────────────────────────────
+  double _screenWidth(BuildContext context) => MediaQuery.sizeOf(context).width;
+  bool _isCompact(BuildContext context) => _screenWidth(context) < 620;
+  bool _isMedium(BuildContext context) =>
+      _screenWidth(context) >= 620 && _screenWidth(context) < 980;
+
+  double _horizontalPagePadding(BuildContext context) {
+    if (_isCompact(context)) return 14;
+    if (_isMedium(context)) return 20;
+    return 28;
+  }
+
+  double _dialogWidth(BuildContext context, double desired) {
+    final available = _screenWidth(context) - 48;
+    return desired > available ? available.clamp(240, desired) : desired;
+  }
 
   @override
   void initState() {
@@ -172,13 +191,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
     try {
       await TeacherService.instance.logout();
-    } catch (_) {
-      // The Teacher app can still close when the local server is unavailable.
-    }
+    } catch (_) {}
 
-    // This is a Windows-account driven app. Keep the secure Teacher/Windows
-    // profile link for the next launch, clear only the short-lived API session,
-    // and close the normal desktop window instead of showing an Admin login.
     exit(0);
   }
 
@@ -197,51 +211,59 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      body: Stack(
-        children: [
-          _ambientBackground(),
-          Column(
-            children: [
-              _topBar(),
-              Expanded(
-                child: FutureBuilder<(LabOverview, List<FaultReport>)>(
-                  future: _future,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                        child: Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            color: _card,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: _border),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _ambientBackground(),
+            Column(
+              children: [
+                _topBar(),
+                Expanded(
+                  child: FutureBuilder<(LabOverview, List<FaultReport>)>(
+                    future: _future,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: _card,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: _border),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 20,
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: CircularProgressIndicator(
+                              color: _accentAForeground,
+                              strokeWidth: 2.5,
+                            ),
                           ),
-                          padding: const EdgeInsets.all(16),
-                          child: CircularProgressIndicator(
-                            color: _accentAForeground,
-                            strokeWidth: 2.4,
-                          ),
-                        ),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return _errorState(cleanError(snapshot.error!));
-                    }
-                    final data = snapshot.data;
-                    if (data == null) return _errorState('No room data found.');
-                    return _content(data.$1, data.$2);
-                  },
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return _errorState(cleanError(snapshot.error!));
+                      }
+                      final data = snapshot.data;
+                      if (data == null) return _errorState('No room data found.');
+                      return _content(data.$1, data.$2);
+                    },
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const Positioned(
-            left: 20,
-            bottom: 20,
-            child: ThemeToggleButton(),
-          ),
-        ],
+              ],
+            ),
+            Positioned(
+              left: _isCompact(context) ? 14 : 24,
+              bottom: _isCompact(context) ? 14 : 24,
+              child: const ThemeToggleButton(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -251,16 +273,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       child: Stack(
         children: [
           Positioned(
-            top: -180,
-            left: -120,
+            top: -200,
+            left: -150,
             child: Container(
-              width: 520,
-              height: 520,
+              width: 580,
+              height: 580,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    _accentB.withValues(alpha: _dark ? 0.15 : 0.12),
+                    _accentB.withValues(alpha: _dark ? 0.18 : 0.10),
                     Colors.transparent,
                   ],
                 ),
@@ -268,16 +290,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             ),
           ),
           Positioned(
-            right: -180,
-            bottom: -220,
+            right: -200,
+            bottom: -250,
             child: Container(
-              width: 620,
-              height: 620,
+              width: 680,
+              height: 680,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    _accentAForeground.withValues(alpha: _dark ? 0.12 : 0.10),
+                    _accentAForeground.withValues(alpha: _dark ? 0.14 : 0.08),
                     Colors.transparent,
                   ],
                 ),
@@ -291,132 +313,275 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Widget _topBar() {
     final room = widget.user.assignedRoomName ?? 'Unassigned';
-
-    // Show the real Windows user currently using this shared Teacher account.
-    // The SysWatch Teacher account (for example teacher706) is still used for
-    // permissions/room access, but it is not shown as the person using the PC.
     final windowsAccount = TeacherWindowsSessionService.instance.cachedAccount;
-    final currentUserDisplayName = windowsAccount?.displayLabel ??
-        widget.user.displayName;
+    final currentUserDisplayName =
+        windowsAccount?.displayLabel ?? widget.user.displayName;
 
-    final navBg = _dark ? _card.withValues(alpha: 0.96) : _accentB;
+    final navBg = _dark ? _card.withValues(alpha: 0.94) : _accentB;
     final navFg = _dark ? _text : Colors.white;
     final navSub = _dark ? _sub : Colors.white70;
-    final navBorder = _dark ? _border : Colors.white.withOpacity(0.1);
+    final navBorder = _dark ? _border : Colors.white.withOpacity(0.12);
+
+    final compact = _isCompact(context);
+
+    final logo = Container(
+      width: compact ? 40 : 46,
+      height: compact ? 40 : 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          colors: [
+            _accentAForeground.withValues(alpha: 0.25),
+            _accentAForeground.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: _dark
+              ? _accentColor.withValues(alpha: 0.45)
+              : Colors.white.withOpacity(0.35),
+          width: 1.2,
+        ),
+      ),
+      child: Icon(
+        Icons.school_rounded,
+        color: _dark ? _accentAForeground : Colors.white,
+        size: compact ? 22 : 25,
+      ),
+    );
+
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'SysWatch',
+              style: TextStyle(
+                color: navFg,
+                fontSize: compact ? 16 : 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _accentAForeground.withValues(alpha: 0.20),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'TEACHER',
+                style: TextStyle(
+                  color: _dark ? _accentAForeground : Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Laboratory $room · Monitoring Dashboard',
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: navSub,
+            fontSize: compact ? 11 : 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+
+    final userChip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _dark ? navBorder : Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: _accentAForeground.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.person_rounded,
+              color: _dark ? _accentAForeground : Colors.white,
+              size: 14,
+            ),
+          ),
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: compact ? 120 : 180),
+            child: Text(
+              currentUserDisplayName,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: navFg,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final actions = <Widget>[
+      if (!compact && _latestRoom != null) ...[
+        _gradientButton(
+          label: 'Attendance',
+          icon: Icons.co_present_rounded,
+          onPressed: () => _openAttendance(_latestRoom!),
+        ),
+        const SizedBox(width: 8),
+      ],
+      if (!compact) ...[
+        _gradientButton(
+          label: 'Chat ITSO',
+          icon: Icons.forum_rounded,
+          onPressed: _openChat,
+        ),
+        const SizedBox(width: 8),
+      ],
+      _iconTile(
+        icon: Icons.refresh_rounded,
+        tooltip: 'Refresh dashboard',
+        onPressed: _refresh,
+      ),
+      const SizedBox(width: 8),
+      _iconTile(
+        icon: _loggingOut
+            ? Icons.hourglass_top_rounded
+            : Icons.logout_rounded,
+        tooltip: 'Close Teacher App',
+        onPressed: _loggingOut ? null : _logout,
+      ),
+      if (compact) ...[
+        const SizedBox(width: 8),
+        _overflowMenu(navBorder),
+      ],
+    ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 24,
+        vertical: compact ? 10 : 14,
+      ),
       decoration: BoxDecoration(
         color: navBg,
         border: Border(bottom: BorderSide(color: navBorder)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: _dark ? 0.16 : 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: _dark ? 0.25 : 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: compact
+          ? Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color: _dark ? _accentColor.withValues(alpha: 0.14) : Colors.white.withOpacity(0.2),
-                border: Border.all(
-                  color: _dark ? _accentColor.withValues(alpha: 0.38) : Colors.white.withOpacity(0.3),
-                  width: 1.2,
-                ),
-              ),
-              child: Icon(
-                Icons.school_rounded,
-                color: _dark ? _accentAForeground : Colors.white,
-                size: 24,
-              ),
-            ),
-          const SizedBox(width: 13),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                'SysWatch Teacher',
-                style: TextStyle(
-                  color: navFg,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.1,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Laboratory $room · Monitoring Dashboard',
-                style: TextStyle(color: navSub, fontSize: 11.5),
-              ),
+              logo,
+              const SizedBox(width: 10),
+              Expanded(child: titleBlock),
+              ...actions,
             ],
           ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _dark ? _field : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _dark ? navBorder : Colors.black.withOpacity(0.1), width: 1.2),
-              boxShadow: [
-                if (!_dark)
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: _dark ? _accentAForeground.withValues(alpha: 0.12) : _accentB.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.person_rounded, color: _dark ? _accentAForeground : _accentB, size: 15),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  currentUserDisplayName,
-                  style: TextStyle(
-                    color: _dark ? navFg : Colors.black87,
-                    fontSize: 12.8,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _gradientButton(
-            label: 'Chat with ITSO',
-            icon: Icons.forum_rounded,
-            onPressed: _openChat,
-          ),
-          const SizedBox(width: 8),
-          _iconTile(
-            icon: Icons.refresh_rounded,
-            tooltip: 'Refresh dashboard',
-            onPressed: _refresh,
-          ),
-          const SizedBox(width: 8),
-          _iconTile(
-            icon: _loggingOut
-                ? Icons.hourglass_top_rounded
-                : Icons.logout_rounded,
-            tooltip: 'Close Teacher App',
-            onPressed: _loggingOut ? null : _logout,
-          ),
+          const SizedBox(height: 10),
+          userChip,
         ],
+      )
+          : Row(
+        children: [
+          logo,
+          const SizedBox(width: 14),
+          Expanded(child: titleBlock),
+          const SizedBox(width: 12),
+          userChip,
+          const SizedBox(width: 14),
+          ...actions,
+        ],
+      ),
+    );
+  }
+
+  Widget _overflowMenu(Color navBorder) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: navBorder),
+        ),
+        child: PopupMenuButton<String>(
+          tooltip: 'More actions',
+          icon: Icon(
+            Icons.more_vert_rounded,
+            color: _dark ? _sub : Colors.white70,
+            size: 20,
+          ),
+          color: _card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          onSelected: (value) {
+            if (value == 'attendance' && _latestRoom != null) {
+              _openAttendance(_latestRoom!);
+            } else if (value == 'chat') {
+              _openChat();
+            }
+          },
+          itemBuilder: (context) => [
+            if (_latestRoom != null)
+              PopupMenuItem(
+                value: 'attendance',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.co_present_rounded,
+                      size: 18,
+                      color: _accentAForeground,
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Student Attendance', style: TextStyle(color: _text)),
+                  ],
+                ),
+              ),
+            PopupMenuItem(
+              value: 'chat',
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.forum_rounded,
+                    size: 18,
+                    color: _accentAForeground,
+                  ),
+                  const SizedBox(width: 10),
+                  Text('Chat with ITSO', style: TextStyle(color: _text)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -426,7 +591,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     required String tooltip,
     required VoidCallback? onPressed,
   }) {
-    final navBorder = _dark ? _border : Colors.white.withOpacity(0.1);
+    final navBorder = _dark ? _border : Colors.white.withOpacity(0.15);
     return Tooltip(
       message: tooltip,
       child: SizedBox(
@@ -443,7 +608,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: onPressed,
-              child: Icon(icon, color: _dark ? _sub : Colors.white70, size: 19),
+              child: Icon(
+                icon,
+                color: _dark ? _text : Colors.white,
+                size: 19,
+              ),
             ),
           ),
         ),
@@ -461,6 +630,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       decoration: BoxDecoration(
         color: disabled ? _field : _accentColor,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: disabled
+            ? null
+            : [
+          BoxShadow(
+            color: _accentColor.withValues(alpha: 0.28),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -468,7 +646,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           borderRadius: BorderRadius.circular(12),
           onTap: onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -477,13 +655,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   size: 17,
                   color: disabled ? _sub : (_dark ? Colors.black : Colors.white),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 Text(
                   label,
                   style: TextStyle(
                     color: disabled ? _sub : (_dark ? Colors.black : Colors.white),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.8,
                   ),
                 ),
               ],
@@ -503,10 +681,22 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     );
   }
 
+  Future<void> _openAttendance(LabOverview room) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentAttendanceScreen(
+          user: widget.user,
+          room: room,
+        ),
+      ),
+    );
+  }
+
   List<FaultReport> _reportsForPc(
-    LabWorkstation pc,
-    List<FaultReport> reports,
-  ) {
+      LabWorkstation pc,
+      List<FaultReport> reports,
+      ) {
     final workstationId = pc.workstationId.trim().toLowerCase();
     final pcId = pc.pcId.trim().toLowerCase();
     return reports.where((report) {
@@ -518,17 +708,24 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }
 
   Widget _content(LabOverview room, List<FaultReport> reports) {
-    final openReports = reports.where((report) => !report.repaired && report.workflowStatus != 'resolved').toList();
-    final resolvedReports = reports.where((report) => report.repaired || report.workflowStatus == 'resolved').toList();
+    _latestRoom = room;
+    final openReports = reports
+        .where((report) => !report.repaired && report.workflowStatus != 'resolved')
+        .toList();
+    final resolvedReports = reports
+        .where((report) => report.repaired || report.workflowStatus == 'resolved')
+        .toList();
     final reportableWorkstations =
-        room.workstations.where((pc) => pc.canReport).toList();
+    room.workstations.where((pc) => pc.canReport).toList();
     final color = _conditionColor(room.maintenanceColor);
+    final hPad = _horizontalPagePadding(context);
+    final compact = _isCompact(context);
 
     return RefreshIndicator(
       color: _accentAForeground,
       onRefresh: () async => _refresh(),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 86),
+        padding: EdgeInsets.fromLTRB(hPad, hPad, hPad, 86),
         children: [
           Center(
             child: ConstrainedBox(
@@ -537,41 +734,66 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _roomHeader(room, color),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   _sectionCard(
                     icon: Icons.grid_view_rounded,
-                    title: 'Lab Map',
+                    title: 'Lab Workstation Map',
                     subtitle: room.workstations.isEmpty
-                        ? 'No PC slots are configured for Laboratory ${room.roomName}.'
-                        : 'Select any PC to view its reports. Unregistered slots remain visible until the Student PC registers.',
+                        ? 'No PC slots configured for Laboratory ${room.roomName}.'
+                        : 'Select any workstation slot to inspect active status or view detailed reports.',
+                    trailing: compact
+                        ? null
+                        : _gradientButton(
+                      label: 'Student Attendance',
+                      icon: Icons.co_present_rounded,
+                      onPressed: () => _openAttendance(room),
+                    ),
+                    trailingBelow: compact
+                        ? SizedBox(
+                      width: double.infinity,
+                      child: _gradientButton(
+                        label: 'Student Attendance',
+                        icon: Icons.co_present_rounded,
+                        onPressed: () => _openAttendance(room),
+                      ),
+                    )
+                        : null,
                     child: room.workstations.isEmpty
                         ? _emptyLabMap(room)
-                        : Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
-                              for (final pc in room.workstations)
-                                SizedBox(
-                                  width: 140,
-                                  height: 140,
-                                  child: _pcTile(
-                                    pc,
-                                    _reportsForPc(pc, reports),
-                                  ),
+                        : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final (tileWidth, tileHeight) =
+                        _pcTileDimensions(constraints.maxWidth);
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            for (final pc in room.workstations)
+                              SizedBox(
+                                width: tileWidth,
+                                height: tileHeight,
+                                child: _pcTile(
+                                  pc,
+                                  _reportsForPc(pc, reports),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   _sectionCard(
                     icon: Icons.assignment_rounded,
-                    title: 'Room Reports',
+                    title: 'Active Room Reports',
                     subtitle: openReports.isEmpty
-                        ? 'No unresolved reports in Laboratory ${room.roomName}.'
-                        : '${openReports.length} unresolved report${openReports.length == 1 ? '' : 's'} need attention. Click a report to open its details.',
-                    trailing: _gradientButton(
+                        ? 'No unresolved issues currently reported in Laboratory ${room.roomName}.'
+                        : '${openReports.length} report${openReports.length == 1 ? '' : 's'} requiring attention.',
+                    trailing: compact
+                        ? null
+                        : _gradientButton(
                       label: 'Report Damaged PC',
-                      icon: Icons.support_agent_rounded,
+                      icon: Icons.add_alert_rounded,
                       onPressed: () {
                         if (reportableWorkstations.isEmpty) {
                           _showNoRegisteredPcDialog(room);
@@ -580,22 +802,38 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         }
                       },
                     ),
+                    trailingBelow: compact
+                        ? SizedBox(
+                      width: double.infinity,
+                      child: _gradientButton(
+                        label: 'Report Damaged PC',
+                        icon: Icons.add_alert_rounded,
+                        onPressed: () {
+                          if (reportableWorkstations.isEmpty) {
+                            _showNoRegisteredPcDialog(room);
+                          } else {
+                            _showCreateReport(room);
+                          }
+                        },
+                      ),
+                    )
+                        : null,
                     child: openReports.isEmpty
                         ? _emptyReports()
                         : Column(
-                            children: [
-                              for (final report in openReports)
-                                _reportCard(report),
-                            ],
-                          ),
+                      children: [
+                        for (final report in openReports)
+                          _reportCard(report),
+                      ],
+                    ),
                   ),
                   if (resolvedReports.isNotEmpty) ...[
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
                     _sectionCard(
                       icon: Icons.history_rounded,
-                      title: 'Report History',
+                      title: 'Report History Log',
                       subtitle:
-                          '${resolvedReports.length} resolved report${resolvedReports.length == 1 ? '' : 's'}. Click any report to view the complete history.',
+                      '${resolvedReports.length} resolved fault report${resolvedReports.length == 1 ? '' : 's'} archived.',
                       child: Column(
                         children: [
                           for (final report in resolvedReports.take(100))
@@ -613,27 +851,52 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     );
   }
 
+  (double, double) _pcTileDimensions(double availableWidth) {
+    const spacing = 12.0;
+    const targetColumns = 10;
+    const minTileWidth = 90.0;
+
+    if (availableWidth <= 0) return (130.0, 134.0);
+
+    final widthFor10 =
+        (availableWidth - (targetColumns - 1) * spacing) / targetColumns;
+
+    if (widthFor10 >= minTileWidth) {
+      return (widthFor10, 134.0);
+    }
+
+    final columns = ((availableWidth + spacing) / (minTileWidth + spacing))
+        .floor()
+        .clamp(2, targetColumns);
+    final width = (availableWidth - (columns - 1) * spacing) / columns;
+    return (width, 134.0);
+  }
+
   Widget _emptyLabMap(LabOverview room) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
       decoration: BoxDecoration(
-        color: _field.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(15),
+        color: _field.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
       ),
       child: Column(
         children: [
-          Icon(Icons.desktop_access_disabled_rounded, color: _sub, size: 34),
-          const SizedBox(height: 10),
+          Icon(Icons.desktop_access_disabled_rounded, color: _sub, size: 38),
+          const SizedBox(height: 12),
           Text(
-            'No PC slots available',
-            style: TextStyle(color: _text, fontWeight: FontWeight.w800),
+            'No PC Slots Configured',
+            style: TextStyle(
+              color: _text,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
-            'Set the PC count for Laboratory ${room.roomName} in the Admin app, or register Student PCs in this room.',
+            'Configure workstation slots for Laboratory ${room.roomName} in the Admin dashboard.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: _sub, fontSize: 12.2, height: 1.4),
+            style: TextStyle(color: _sub, fontSize: 12.5, height: 1.4),
           ),
         ],
       ),
@@ -648,9 +911,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         shape: _dialogShape,
         title: _dialogTitle('No PC Slot Available', Icons.desktop_access_disabled_rounded),
         content: SizedBox(
-          width: 430,
+          width: _dialogWidth(context, 430),
           child: Text(
-            'Laboratory ${room.roomName} is accessible, but it has no PC slot to report against. Set the room PC count in the Admin app or register a Student PC in Laboratory ${room.roomName}. Existing reports remain accessible.',
+            'Laboratory ${room.roomName} has no registered PC slots available for reporting. Configure PC counts in the Admin app or connect a student computer.',
             style: TextStyle(color: _sub, fontSize: 13, height: 1.5),
           ),
         ),
@@ -667,18 +930,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     required String subtitle,
     required Widget child,
     Widget? trailing,
+    Widget? trailingBelow,
   }) {
+    final compact = _isCompact(context);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(compact ? 16 : 22),
       decoration: BoxDecoration(
-        color: _card.withValues(alpha: _dark ? 0.92 : 0.98),
-        borderRadius: BorderRadius.circular(20),
+        color: _card,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: _dark ? 0.12 : 0.035),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: _dark ? 0.18 : 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -686,18 +951,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: _accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _accentColor.withValues(alpha: 0.22)),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _accentColor.withValues(alpha: 0.25)),
                 ),
-                child: Icon(icon, color: _accentAForeground, size: 19),
+                child: Icon(icon, color: _accentAForeground, size: 21),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,14 +972,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                       title,
                       style: TextStyle(
                         color: _text,
-                        fontSize: 15.5,
+                        fontSize: 16.5,
                         fontWeight: FontWeight.w800,
+                        letterSpacing: 0.1,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: TextStyle(color: _sub, fontSize: 11.8),
+                      style: TextStyle(color: _sub, fontSize: 12),
                     ),
                   ],
                 ),
@@ -721,7 +988,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               if (trailing != null) trailing,
             ],
           ),
-          const SizedBox(height: 16),
+          if (trailingBelow != null) ...[
+            const SizedBox(height: 14),
+            trailingBelow,
+          ],
+          const SizedBox(height: 20),
           child,
         ],
       ),
@@ -732,103 +1003,142 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final healthy = room.maintenanceColor == 'green';
     final warning = room.maintenanceColor == 'yellow';
     final statusText = room.unregisteredPcCount > 0 && healthy
-        ? '${room.unregisteredPcCount} PC slot${room.unregisteredPcCount == 1 ? '' : 's'} are not registered yet. Existing reports and room slots remain accessible.'
+        ? '${room.unregisteredPcCount} slot${room.unregisteredPcCount == 1 ? '' : 's'} pending registration.'
         : healthy
-        ? 'All reported checks are clear.'
+        ? 'All workstation diagnostics clear.'
         : warning
-        ? 'The room has 1–3 active minor problems.'
-        : 'The room has many problems or a high/critical problem.';
+        ? 'Active minor workstation issues detected.'
+        : 'Attention required: critical workstation faults detected.';
+
+    final compact = _isCompact(context);
+
+    final icon = Container(
+      width: compact ? 56 : 68,
+      height: compact ? 56 : 68,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.32), width: 1.5),
+      ),
+      child: Icon(
+        Icons.meeting_room_rounded,
+        color: color,
+        size: compact ? 28 : 34,
+      ),
+    );
+
+    final titleAndStatus = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 6,
+          children: [
+            Text(
+              'Laboratory ${room.roomName}',
+              style: TextStyle(
+                color: _text,
+                fontSize: compact ? 20 : 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    healthy ? 'HEALTHY' : warning ? 'WARNING' : 'ATTENTION',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          statusText,
+          style: TextStyle(color: _sub, fontSize: 13, height: 1.35),
+        ),
+      ],
+    );
+
+    final metrics = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: compact ? WrapAlignment.start : WrapAlignment.end,
+      children: [
+        _metric('Online', room.onlinePcCount, const Color(0xFF22A06B)),
+        _metric('Offline', room.offlinePcCount, Colors.blueGrey),
+        if (room.unregisteredPcCount > 0)
+          _metric('Unregistered', room.unregisteredPcCount, const Color(0xFF8A8F98)),
+        _metric('Problems', room.activeProblemCount, color),
+        _metric(
+          'Approve',
+          room.awaitingTeacherApprovalCount,
+          _accentBForeground,
+        ),
+      ],
+    );
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: EdgeInsets.all(compact ? 18 : 24),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: _dark ? 0.08 : 0.04),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: color.withValues(alpha: 0.48), width: 1.4),
+        color: color.withValues(alpha: _dark ? 0.08 : 0.035),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: _dark ? 0.10 : 0.06),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
+            color: color.withValues(alpha: _dark ? 0.12 : 0.06),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Row(
+      child: compact
+          ? Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: color.withValues(alpha: 0.12),
-              border: Border.all(color: color.withValues(alpha: 0.28)),
-            ),
-            child: Icon(Icons.meeting_room_rounded, color: color, size: 31),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              icon,
+              const SizedBox(width: 14),
+              Expanded(child: titleAndStatus),
+            ],
           ),
-          const SizedBox(width: 17),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Laboratory ${room.roomName}',
-                      style: TextStyle(
-                        color: _text,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: color.withValues(alpha: 0.24)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            healthy ? 'HEALTHY' : warning ? 'WARNING' : 'ATTENTION',
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  statusText,
-                  style: TextStyle(color: _sub, fontSize: 12.7, height: 1.35),
-                ),
-              ],
-            ),
-          ),
-          _metric('Online', room.onlinePcCount, const Color(0xFF22A06B)),
-          _metric('Offline', room.offlinePcCount, Colors.blueGrey),
-          if (room.unregisteredPcCount > 0)
-            _metric('Unreg.', room.unregisteredPcCount, const Color(0xFF8A8F98)),
-          _metric('Problems', room.activeProblemCount, color),
-          _metric(
-            'Approve',
-            room.awaitingTeacherApprovalCount,
-            _accentBForeground,
-          ),
+          const SizedBox(height: 18),
+          metrics,
+        ],
+      )
+          : Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          icon,
+          const SizedBox(width: 18),
+          Expanded(child: titleAndStatus),
+          const SizedBox(width: 12),
+          metrics,
         ],
       ),
     );
@@ -836,13 +1146,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Widget _metric(String label, int value, Color color) {
     return Container(
-      width: 88,
-      margin: const EdgeInsets.only(left: 10),
-      padding: const EdgeInsets.symmetric(vertical: 11),
+      width: 92,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: _field.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -850,18 +1166,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             '$value',
             style: TextStyle(
               color: color,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
               height: 1,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: _sub,
               fontSize: 10.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -878,7 +1196,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ? (pc.isOnline ? const Color(0xFF22A06B) : Colors.blueGrey)
         : const Color(0xFF8A8F98);
     final connectionLabel = !pc.isRegistered
-        ? 'UNREGISTERED'
+        ? 'UNREG'
         : (pc.isOnline ? 'ONLINE' : 'OFFLINE');
 
     return Material(
@@ -891,74 +1209,74 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             color: statusColor.withValues(alpha: _dark ? 0.08 : 0.04),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: statusColor.withValues(alpha: 0.48),
+              color: statusColor.withValues(alpha: 0.45),
               width: 1.2,
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(13),
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     pc.isRegistered
                         ? Icons.computer_rounded
                         : Icons.desktop_access_disabled_rounded,
                     color: statusColor,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
                   pc.pcId,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _text,
-                    fontSize: 13.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 7,
+                    vertical: 2.5,
                   ),
                   decoration: BoxDecoration(
-                    color: connectionColor.withValues(alpha: 0.10),
+                    color: connectionColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: connectionColor.withValues(alpha: 0.20),
+                      color: connectionColor.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 6,
-                        height: 6,
+                        width: 5,
+                        height: 5,
                         decoration: BoxDecoration(
                           color: connectionColor,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                       Flexible(
                         child: Text(
                           connectionLabel,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: connectionColor,
-                            fontSize: pc.isRegistered ? 9.5 : 8.3,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: 0.3,
                           ),
                         ),
@@ -967,13 +1285,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   ),
                 ),
                 if (pcReports.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
-                    '${pcReports.length} report${pcReports.length == 1 ? '' : 's'}',
+                    '${pcReports.length} issue${pcReports.length == 1 ? '' : 's'}',
                     style: TextStyle(
                       color: maintenanceColor,
                       fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -989,144 +1307,184 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final busy = _busyReports.contains(report.id);
     final severityColor = _severityColor(report.severity);
     final workflow = _workflowLabel(report.workflowStatus);
+    final compact = _isCompact(context);
+
+    final actionArea = busy
+        ? SizedBox(
+      width: 32,
+      height: 32,
+      child: CircularProgressIndicator(
+        strokeWidth: 2.4,
+        color: _accentAForeground,
+      ),
+    )
+        : (report.workflowStatus == 'reported' ||
+        report.workflowStatus == 'reopened')
+        ? _outlineAction(
+      label: 'Send to ITSO',
+      icon: Icons.send_rounded,
+      onPressed: () => _showForwardDialog(report),
+    )
+        : report.workflowStatus == 'awaiting_teacher_approval'
+        ? Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _outlineAction(
+          label: 'Still Damaged',
+          icon: Icons.close_rounded,
+          onPressed: () => _showVerifyDialog(report, false),
+        ),
+        _gradientButton(
+          label: 'PC is OK',
+          icon: Icons.check_rounded,
+          onPressed: () => _showVerifyDialog(report, true),
+        ),
+      ],
+    )
+        : null;
+
+    final infoColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${report.pcId} · ${report.issue}',
+                style: TextStyle(
+                  color: _text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: _sub,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          report.details,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: _sub,
+            fontSize: 12.5,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Reported: ${formatDateTime(report.createdAt)}'
+              '${report.acceptedByName != null ? '\nAccepted by ITSO: ${report.acceptedByName} · ${formatDateTime(report.acceptedAt)}' : ''}'
+              '${report.handledByName != null ? '\nHandled by ITSO: ${report.handledByName} · ${formatDateTime(report.handledAt)}' : ''}'
+              '${report.completedByName != null ? '\nCompleted by ITSO: ${report.completedByName} · ${formatDateTime(report.completedAt)}' : ''}'
+              '${report.repairedAt != null ? '\nITSO Fixed: ${formatDateTime(report.repairedAt)}' : ''}'
+              '${report.teacherApprovedAt != null ? '\nTeacher Verified: ${formatDateTime(report.teacherApprovedAt)}' : ''}',
+          style: TextStyle(
+            color: _sub,
+            fontSize: 11,
+            height: 1.35,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _statusChip(
+              report.severity.toUpperCase(),
+              severityColor,
+            ),
+            _statusChip(workflow, _accentBForeground),
+            if (report.queuePosition != null)
+              _statusChip(
+                'QUEUE #${report.queuePosition}',
+                const Color(0xFF8E6CEF),
+              ),
+          ],
+        ),
+      ],
+    );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => _showReportDetails(report),
           child: Ink(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _field.withValues(alpha: _dark ? 0.74 : 0.84),
-              borderRadius: BorderRadius.circular(15),
+              color: _field.withValues(alpha: _dark ? 0.6 : 0.7),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: _border),
             ),
-            child: Row(
+            child: compact
+                ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: severityColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: severityColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.report_rounded,
+                        color: severityColor,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(child: infoColumn),
+                  ],
+                ),
+                if (actionArea != null) ...[
+                  const SizedBox(height: 14),
+                  actionArea,
+                ],
+              ],
+            )
+                : Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: severityColor.withValues(alpha: 0.11),
-                    borderRadius: BorderRadius.circular(12),
+                    color: severityColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
                     border: Border.all(
-                      color: severityColor.withValues(alpha: 0.20),
+                      color: severityColor.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Icon(
                     Icons.report_rounded,
                     color: severityColor,
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${report.pcId} · ${report.issue}',
-                              style: TextStyle(
-                                color: _text,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.open_in_new_rounded,
-                            size: 15,
-                            color: _sub,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        report.details,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _sub,
-                          fontSize: 12,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        'Reported: ${formatDateTime(report.createdAt)}'
-                        '${report.acceptedByName != null ? '\nAccepted by ITSO: ${report.acceptedByName} · ${formatDateTime(report.acceptedAt)}' : ''}'
-                        '${report.handledByName != null ? '\nHandled by ITSO: ${report.handledByName} · ${formatDateTime(report.handledAt)}' : ''}'
-                        '${report.completedByName != null ? '\nCompleted by ITSO: ${report.completedByName} · ${formatDateTime(report.completedAt)}' : ''}'
-                        '${report.repairedAt != null ? '\nITSO Fixed: ${formatDateTime(report.repairedAt)}' : ''}'
-                        '${report.teacherApprovedAt != null ? '\nTeacher Verified: ${formatDateTime(report.teacherApprovedAt)}' : ''}',
-                        style: TextStyle(
-                          color: _sub,
-                          fontSize: 11.2,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 5,
-                        children: [
-                          _statusChip(
-                            report.severity.toUpperCase(),
-                            severityColor,
-                          ),
-                          _statusChip(workflow, _accentBForeground),
-                          if (report.queuePosition != null)
-                            _statusChip(
-                              'QUEUE #${report.queuePosition}',
-                              const Color(0xFF8E6CEF),
-                            ),
-                        ],
-                      ),
-                    ],
+                    size: 22,
                   ),
                 ),
                 const SizedBox(width: 14),
-                if (busy)
-                  SizedBox(
-                    width: 34,
-                    height: 34,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      color: _accentAForeground,
-                    ),
-                  )
-                else if (report.workflowStatus == 'reported' ||
-                    report.workflowStatus == 'reopened')
-                  _outlineAction(
-                    label: 'Send to ITSO',
-                    icon: Icons.send_rounded,
-                    onPressed: () => _showForwardDialog(report),
-                  )
-                else if (report.workflowStatus == 'awaiting_teacher_approval')
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      _outlineAction(
-                        label: 'Still Damaged',
-                        icon: Icons.close_rounded,
-                        onPressed: () => _showVerifyDialog(report, false),
-                      ),
-                      _gradientButton(
-                        label: 'PC is OK',
-                        icon: Icons.check_rounded,
-                        onPressed: () => _showVerifyDialog(report, true),
-                      ),
-                    ],
-                  ),
+                Expanded(child: infoColumn),
+                if (actionArea != null) ...[
+                  const SizedBox(width: 16),
+                  actionArea,
+                ],
               ],
             ),
           ),
@@ -1141,26 +1499,27 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     Widget detailRow(String label, String value, {Color? valueColor}) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.start,
           children: [
             SizedBox(
-              width: 150,
+              width: 140,
               child: Text(
                 label,
                 style: TextStyle(
                   color: _sub,
-                  fontSize: 12.2,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            Expanded(
+            SizedBox(
+              width: _dialogWidth(context, 620) - 140 - 44,
               child: SelectableText(
                 value.isEmpty ? '—' : value,
                 style: TextStyle(
                   color: valueColor ?? _text,
-                  fontSize: 12.8,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   height: 1.35,
                 ),
@@ -1184,7 +1543,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           Icons.description_rounded,
         ),
         content: SizedBox(
-          width: 620,
+          width: _dialogWidth(context, 620),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1207,35 +1566,35 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 ),
                 const SizedBox(height: 12),
                 Divider(color: _border),
-                detailRow('PC', report.pcId),
+                detailRow('PC ID', report.pcId),
                 detailRow('Laboratory', report.roomName),
                 detailRow('Workstation ID', report.workstationId),
                 detailRow('Issue', report.issue),
                 detailRow('Severity', report.severity.toUpperCase(), valueColor: severityColor),
                 detailRow('Source', report.source),
-                detailRow('Reported', formatDateTime(report.createdAt)),
+                detailRow('Reported At', formatDateTime(report.createdAt)),
                 if (report.studentEmail != null)
-                  detailRow('Student account', report.studentEmail!),
-                const SizedBox(height: 8),
+                  detailRow('Student Account', report.studentEmail!),
+                const SizedBox(height: 10),
                 Text(
                   'Description',
                   style: TextStyle(
                     color: _sub,
-                    fontSize: 12.2,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.all(13),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: _field,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: _border),
                   ),
                   child: SelectableText(
-                    report.details.isEmpty ? 'No description.' : report.details,
-                    style: TextStyle(color: _text, fontSize: 12.8, height: 1.45),
+                    report.details.isEmpty ? 'No description provided.' : report.details,
+                    style: TextStyle(color: _text, fontSize: 13, height: 1.45),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1256,57 +1615,57 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     '${report.completedByName} · ${formatDateTime(report.completedAt)}',
                   ),
                 if (report.repairedAt != null)
-                  detailRow('Repair date', formatDateTime(report.repairedAt)),
+                  detailRow('Repair Date', formatDateTime(report.repairedAt)),
                 if (report.teacherApprovedAt != null)
                   detailRow(
-                    'Teacher verified',
+                    'Teacher Verified',
                     formatDateTime(report.teacherApprovedAt),
                   ),
                 if (report.technicianNotes != null) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
-                    'ITSO repair notes',
+                    'ITSO Repair Notes',
                     style: TextStyle(
                       color: _sub,
-                      fontSize: 12.2,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.all(13),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: _field,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: _border),
                     ),
                     child: SelectableText(
                       report.technicianNotes!,
-                      style: TextStyle(color: _text, fontSize: 12.8, height: 1.45),
+                      style: TextStyle(color: _text, fontSize: 13, height: 1.45),
                     ),
                   ),
                 ],
                 if (report.teacherNotes != null) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'Teacher notes',
+                    'Teacher Notes',
                     style: TextStyle(
                       color: _sub,
-                      fontSize: 12.2,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.all(13),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: _field,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: _border),
                     ),
                     child: SelectableText(
                       report.teacherNotes!,
-                      style: TextStyle(color: _text, fontSize: 12.8, height: 1.45),
+                      style: TextStyle(color: _text, fontSize: 13, height: 1.45),
                     ),
                   ),
                 ],
@@ -1352,19 +1711,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Widget _statusChip(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 9.7,
+          fontSize: 10,
           fontWeight: FontWeight.w800,
-          letterSpacing: 0.35,
+          letterSpacing: 0.4,
         ),
       ),
     );
@@ -1381,10 +1740,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       label: Text(label),
       style: OutlinedButton.styleFrom(
         foregroundColor: _accentBForeground,
-        side: BorderSide(color: _accentBForeground.withValues(alpha: 0.42)),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        side: BorderSide(color: _accentBForeground.withValues(alpha: 0.45)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1419,9 +1778,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     return status.replaceAll('_', ' ').toUpperCase();
   }
 
-  // ── Shared dialog styling helpers ──────────────────────────────────────────
   ShapeBorder get _dialogShape => RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(22),
+    borderRadius: BorderRadius.circular(24),
     side: BorderSide(color: _border),
   );
 
@@ -1429,22 +1787,22 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     return Row(
       children: [
         Container(
-          width: 34,
-          height: 34,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             color: _accentColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: _accentAForeground.withValues(alpha: 0.24)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _accentAForeground.withValues(alpha: 0.25)),
           ),
-          child: Icon(icon, color: _accentAForeground, size: 18),
+          child: Icon(icon, color: _accentAForeground, size: 20),
         ),
-        const SizedBox(width: 11),
+        const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
               color: _text,
-              fontSize: 16.5,
+              fontSize: 17,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1459,36 +1817,36 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: _sub, fontSize: 13),
+      labelStyle: TextStyle(color: _sub, fontSize: 13.5),
       helperText: helperText,
-      helperStyle: TextStyle(color: _sub, fontSize: 11.3),
+      helperStyle: TextStyle(color: _sub, fontSize: 11.5),
       helperMaxLines: 3,
       filled: true,
       fillColor: _field,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: _border),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: _border),
       ),
       disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: _border.withValues(alpha: 0.5)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: _accentAForeground.withValues(alpha: 0.8), width: 1.6),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: _accentAForeground.withValues(alpha: 0.8), width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: _errorColor),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: _errorColor, width: 1.6),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: _errorColor, width: 1.8),
       ),
       errorStyle: TextStyle(color: _errorColor, fontSize: 11.5),
     );
@@ -1499,7 +1857,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: _sub,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       ),
       child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
     );
@@ -1543,7 +1901,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   label,
                   style: TextStyle(
                     color: disabled ? _sub : (_dark ? Colors.black : Colors.white),
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 13,
                   ),
                 ),
@@ -1557,7 +1915,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Future<void> _showCreateReport(LabOverview room) async {
     final reportableWorkstations =
-        room.workstations.where((pc) => pc.canReport).toList();
+    room.workstations.where((pc) => pc.canReport).toList();
     if (reportableWorkstations.isEmpty) {
       await _showNoRegisteredPcDialog(room);
       return;
@@ -1582,7 +1940,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             setDialogState(() => saving = true);
             try {
               final selectedPc = reportableWorkstations.firstWhere(
-                (pc) => pc.workstationId == workstationId,
+                    (pc) => pc.workstationId == workstationId,
               );
               final reportId = await TeacherService.instance.createReport(
                 workstationId: workstationId,
@@ -1616,7 +1974,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
             title: _dialogTitle('Report Damaged PC', Icons.report_problem_rounded),
             content: SizedBox(
-              width: 520,
+              width: _dialogWidth(context, 520),
               child: Form(
                 key: key,
                 child: SingleChildScrollView(
@@ -1628,7 +1986,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         dropdownColor: _card,
                         iconEnabledColor: _accentAForeground,
                         style: TextStyle(color: _text, fontSize: 14),
-                        decoration: _dialogFieldDecoration(label: 'PC'),
+                        decoration: _dialogFieldDecoration(label: 'Select PC'),
                         items: reportableWorkstations
                             .map((pc) => DropdownMenuItem(
                           value: pc.workstationId,
@@ -1649,7 +2007,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         iconEnabledColor: _accentAForeground,
                         style: TextStyle(color: _text, fontSize: 14),
                         decoration: _dialogFieldDecoration(
-                          label: 'Problem',
+                          label: 'Problem Category',
                           helperText: 'Select the closest matching problem.',
                         ),
                         items: _teacherProblemOptions
@@ -1689,16 +2047,21 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         maxLines: 4,
                         style: TextStyle(color: _text, fontSize: 14),
                         cursorColor: _accentAForeground,
-                        decoration: _dialogFieldDecoration(label: 'Details'),
+                        decoration: _dialogFieldDecoration(label: 'Issue Details'),
                         onChanged: (value) => details = value,
                         validator: (value) => (value ?? '').trim().isEmpty
                             ? 'Enter report details.'
                             : null,
                       ),
                       const SizedBox(height: 14),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        runSpacing: 8,
                         children: [
-                          Expanded(
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: _dialogWidth(context, 520) - 32,
+                            ),
                             child: Text(
                               proofImage == null
                                   ? 'Proof image: optional JPG/PNG (max 8 MB)'
@@ -1707,20 +2070,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                               style: TextStyle(color: _sub, fontSize: 12.5),
                             ),
                           ),
-                          const SizedBox(width: 10),
                           OutlinedButton.icon(
                             onPressed: saving
                                 ? null
                                 : () async {
-                                    try {
-                                      final picked = await NativeImagePickerService.instance.pickJpgOrPng();
-                                      if (picked != null && dialogContext.mounted) {
-                                        setDialogState(() => proofImage = picked);
-                                      }
-                                    } catch (error) {
-                                      if (mounted) _message(cleanError(error));
-                                    }
-                                  },
+                              try {
+                                final picked = await NativeImagePickerService.instance.pickJpgOrPng();
+                                if (picked != null && dialogContext.mounted) {
+                                  setDialogState(() => proofImage = picked);
+                                }
+                              } catch (error) {
+                                if (mounted) _message(cleanError(error));
+                              }
+                            },
                             icon: const Icon(Icons.image_outlined, size: 18),
                             label: Text(proofImage == null ? 'Attach Image' : 'Change'),
                           ),
@@ -1729,9 +2091,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                       const SizedBox(height: 14),
                       InputDecorator(
                         decoration: _dialogFieldDecoration(
-                          label: 'Severity',
+                          label: 'Assigned Severity',
                           helperText:
-                          'Severity is assigned automatically from the problem.',
+                          'Severity is assigned automatically based on issue type.',
                         ),
                         child: Row(
                           children: [
@@ -1747,13 +2109,13 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                             const SizedBox(width: 10),
                             Text(
                               severity == null
-                                  ? 'Select a problem first'
+                                  ? 'Select a problem category'
                                   : _severityLabel(severity!),
                               style: TextStyle(
                                 color: severity == null
                                     ? _sub
                                     : _severityColor(severity!),
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 fontSize: 13.5,
                               ),
                             ),
@@ -1861,7 +2223,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
             title: _dialogTitle(title, icon),
             content: SizedBox(
-              width: 460,
+              width: _dialogWidth(context, 460),
               child: Form(
                 key: key,
                 child: Column(
@@ -1879,9 +2241,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                           : null,
                     ),
                     const SizedBox(height: 14),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      runSpacing: 8,
                       children: [
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: _dialogWidth(context, 460) - 32,
+                          ),
                           child: Text(
                             proofImage == null
                                 ? 'Optional proof image (JPG/PNG)'
@@ -1894,15 +2261,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                           onPressed: saving
                               ? null
                               : () async {
-                                  try {
-                                    final picked = await NativeImagePickerService.instance.pickJpgOrPng();
-                                    if (picked != null && dialogContext.mounted) {
-                                      setDialogState(() => proofImage = picked);
-                                    }
-                                  } catch (error) {
-                                    if (mounted) _message(cleanError(error));
-                                  }
-                                },
+                            try {
+                              final picked = await NativeImagePickerService.instance.pickJpgOrPng();
+                              if (picked != null && dialogContext.mounted) {
+                                setDialogState(() => proofImage = picked);
+                              }
+                            } catch (error) {
+                              if (mounted) _message(cleanError(error));
+                            }
+                          },
                           icon: const Icon(Icons.image_outlined, size: 18),
                           label: Text(proofImage == null ? 'Attach' : 'Change'),
                         ),
@@ -1937,31 +2304,31 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
     Widget row(IconData icon, String label, String value, {Color? valueColor}) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: (valueColor ?? _accentAForeground).withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(9),
+                color: (valueColor ?? _accentAForeground).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 16, color: valueColor ?? _accentAForeground),
+              child: Icon(icon, size: 17, color: valueColor ?? _accentAForeground),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(color: _sub, fontSize: 12.5),
+                style: TextStyle(color: _sub, fontSize: 13),
               ),
             ),
             Text(
               value,
               style: TextStyle(
                 color: valueColor ?? _text,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -1969,24 +2336,29 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       );
     }
 
-    Widget expandableProblems(String label, IconData icon, List<FaultReport> reports, Color groupColor) {
+    Widget expandableProblems(
+        String label,
+        IconData icon,
+        List<FaultReport> reports,
+        Color groupColor,
+        ) {
       return Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
           leading: Container(
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: groupColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(9),
+              color: groupColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 16, color: groupColor),
+            child: Icon(icon, size: 17, color: groupColor),
           ),
           title: Text(
             label,
-            style: TextStyle(color: _sub, fontSize: 12.5),
+            style: TextStyle(color: _sub, fontSize: 13),
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1995,8 +2367,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 '${reports.length}',
                 style: TextStyle(
                   color: reports.isEmpty ? _sub : groupColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(width: 4),
@@ -2006,15 +2378,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           children: reports.isEmpty
               ? [
             Padding(
-              padding: const EdgeInsets.fromLTRB(44, 4, 12, 12),
+              padding: const EdgeInsets.fromLTRB(46, 4, 12, 12),
               child: Text(
-                'No issues found',
-                style: TextStyle(color: _sub, fontSize: 12, fontStyle: FontStyle.italic),
+                'No problems logged',
+                style: TextStyle(
+                  color: _sub,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             )
           ]
-              : reports.map((r) => Padding(
-            padding: const EdgeInsets.fromLTRB(44, 4, 12, 12),
+              : reports
+              .map((r) => Padding(
+            padding: const EdgeInsets.fromLTRB(46, 4, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -2034,7 +2411,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         r.issue,
                         style: TextStyle(
                           color: _text,
-                          fontSize: 12,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -2047,13 +2424,18 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     padding: const EdgeInsets.only(left: 14),
                     child: Text(
                       r.details,
-                      style: TextStyle(color: _sub, fontSize: 11.5, height: 1.3),
+                      style: TextStyle(
+                        color: _sub,
+                        fontSize: 11.5,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                 ],
               ],
             ),
-          )).toList(),
+          ))
+              .toList(),
         ),
       );
     }
@@ -2062,7 +2444,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       final s = r.severity.toLowerCase();
       return s == 'high' || s == 'critical' || s == 'emergency';
     }).toList();
-    
+
     final activeReports = pcReports.where((r) {
       final s = r.severity.toLowerCase();
       return s != 'high' && s != 'critical' && s != 'emergency';
@@ -2079,57 +2461,62 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         title: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: color.withValues(alpha: 0.24)),
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: color.withValues(alpha: 0.28)),
               ),
-              child: Icon(Icons.computer_rounded, color: color, size: 20),
+              child: Icon(Icons.computer_rounded, color: color, size: 21),
             ),
             const SizedBox(width: 12),
-            Text(
-              pc.pcId,
-              style: TextStyle(
-                color: _text,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
+            Expanded(
+              child: Text(
+                pc.pcId,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
         ),
         content: SizedBox(
-          width: 360,
+          width: _dialogWidth(context, 380),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 row(
                   Icons.wifi_rounded,
-                  'Connection',
+                  'Connection Status',
                   connectionLabel,
                   valueColor: connectionColor,
                 ),
                 Divider(color: _border, height: 4),
                 row(
                   pc.isRegistered ? Icons.verified_rounded : Icons.info_outline_rounded,
-                  'Registration',
+                  'Registration State',
                   pc.isRegistered ? 'REGISTERED' : 'NOT REGISTERED',
-                  valueColor: pc.isRegistered ? const Color(0xFF22A06B) : const Color(0xFF8A8F98),
+                  valueColor: pc.isRegistered
+                      ? const Color(0xFF22A06B)
+                      : const Color(0xFF8A8F98),
                 ),
                 Divider(color: _border, height: 4),
-                row(Icons.info_outline_rounded, 'Device status', pc.deviceStatus),
+                row(Icons.info_outline_rounded, 'Device Health', pc.deviceStatus),
                 Divider(color: _border, height: 4),
                 expandableProblems(
-                  'Active problems',
+                  'Active Issues',
                   Icons.report_outlined,
                   activeReports,
                   pc.activeProblemCount > 0 ? color : _accentAForeground,
                 ),
                 Divider(color: _border, height: 4),
                 expandableProblems(
-                  'Major problems',
+                  'Major Faults',
                   Icons.priority_high_rounded,
                   majorReports,
                   const Color(0xFFE53935),
@@ -2147,41 +2534,41 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   Widget _emptyReports() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 34),
       decoration: BoxDecoration(
-        color: _field.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(15),
+        color: _field.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
       ),
       child: Column(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: const Color(0xFF22A06B).withValues(alpha: 0.10),
+              color: const Color(0xFF22A06B).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.check_circle_outline_rounded,
               color: Color(0xFF22A06B),
-              size: 26,
+              size: 28,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            'No open reports',
+            'All Clear',
             style: TextStyle(
               color: _text,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            'This laboratory currently has no unresolved teacher reports.',
+            'No unresolved fault reports in this laboratory.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: _sub, fontSize: 11.8),
+            style: TextStyle(color: _sub, fontSize: 12.5),
           ),
         ],
       ),
@@ -2191,16 +2578,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Widget _errorState(String message) {
     return Center(
       child: Container(
-        width: 430,
-        padding: const EdgeInsets.all(24),
+        width: _dialogWidth(context, 430),
+        padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
           color: _card,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _errorColor.withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _errorColor.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: _dark ? 0.14 : 0.04),
-              blurRadius: 24,
+              color: Colors.black.withValues(alpha: _dark ? 0.2 : 0.05),
+              blurRadius: 28,
               offset: const Offset(0, 10),
             ),
           ],
@@ -2209,32 +2596,32 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: _errorColor.withValues(alpha: 0.10),
+                color: _errorColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline_rounded, size: 30, color: _errorColor),
+              child: Icon(Icons.error_outline_rounded, size: 32, color: _errorColor),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
-              'Unable to load dashboard',
+              'Failed to Load Dashboard',
               style: TextStyle(
                 color: _text,
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: _sub, fontSize: 12.5, height: 1.4),
+              style: TextStyle(color: _sub, fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             _gradientButton(
-              label: 'Retry',
+              label: 'Try Again',
               icon: Icons.refresh_rounded,
               onPressed: _refresh,
             ),
@@ -2252,15 +2639,15 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           content: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _accentColor,
                 ),
                 child: Icon(
                   Icons.info_outline_rounded,
-                  size: 17,
+                  size: 18,
                   color: _dark ? Colors.black : Colors.white,
                 ),
               ),
@@ -2271,7 +2658,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   style: TextStyle(
                     color: _text,
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -2279,11 +2666,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           ),
           backgroundColor: _card,
           behavior: SnackBarBehavior.floating,
-          elevation: 0,
+          elevation: 4,
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: _accentAForeground.withValues(alpha: 0.35)),
           ),
         ),
