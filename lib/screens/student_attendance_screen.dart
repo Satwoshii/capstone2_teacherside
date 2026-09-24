@@ -10,6 +10,7 @@ import '../services/student_attendance_service.dart';
 import '../services/teacher_windows_session_service.dart';
 import '../utils/value_helpers.dart';
 import '../widgets/theme_toggle_button.dart';
+import 'student_attendance_logs_screen.dart';
 
 enum _AttendanceViewMode { grid, table }
 
@@ -342,6 +343,22 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
             ),
           ),
           const SizedBox(width: 12),
+          _gradientButton(
+            label: 'Login/Logout Logs',
+            icon: Icons.history_rounded,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StudentAttendanceLogsScreen(
+                    user: widget.user,
+                    room: widget.room,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           _gradientButton(
             label: 'Log Check-In',
             icon: Icons.person_add_alt_1_rounded,

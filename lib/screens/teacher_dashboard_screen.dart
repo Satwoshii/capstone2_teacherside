@@ -120,6 +120,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Timer? _timer;
   bool _loggingOut = false;
   final _busyReports = <String>{};
+  String _historyLogFilter = 'all';
 
   bool get _dark => Theme.of(context).brightness == Brightness.dark;
   Color get _background =>
@@ -832,12 +833,26 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     _sectionCard(
                       icon: Icons.history_rounded,
                       title: 'Report History Log',
-                      subtitle:
-                      '${resolvedReports.length} resolved fault report${resolvedReports.length == 1 ? '' : 's'} archived.',
+                      subtitle: _historyLogFilter == 'all'
+                          ? '${resolvedReports.length} resolved fault report${resolvedReports.length == 1 ? '' : 's'} archived.'
+                          : 'Showing filtered reports (${_filteredResolvedReportsCount(resolvedReports)} of ${resolvedReports.length}) · Tap "Total Archived" or Reset to clear.',
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final report in resolvedReports.take(100))
-                            _reportCard(report),
+                          _historyLogsSummary(resolvedReports),
+                          if (_filteredResolvedReports(resolvedReports).isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: Text(
+                                  'No resolved reports match the selected filter category.',
+                                  style: TextStyle(color: _sub, fontSize: 13),
+                                ),
+                              ),
+                            )
+                          else
+                            for (final report in _filteredResolvedReports(resolvedReports).take(100))
+                              _reportCard(report),
                         ],
                       ),
                     ),
@@ -2571,6 +2586,184 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             style: TextStyle(color: _sub, fontSize: 12.5),
           ),
         ],
+      ),
+    );
+  }
+
+  List<FaultReport> _filteredResolvedReports(List<FaultReport> reports) {
+    return reports.where((r) {
+      if (_historyLogFilter == 'system') return r.detectedBySystem;
+      if (_historyLogFilter == 'student') return !r.detectedBySystem;
+      if (_historyLogFilter == 'high_severity') {
+        final s = r.severity.toLowerCase();
+        return s == 'high' || s == 'critical';
+      }
+      return true;
+    }).toList();
+  }
+
+  int _filteredResolvedReportsCount(List<FaultReport> reports) {
+    return _filteredResolvedReports(reports).length;
+  }
+
+  Widget _historyLogsSummary(List<FaultReport> reports) {
+    final total = reports.length;
+    final systemDetected = reports.where((r) => r.detectedBySystem).length;
+    final studentReported = total - systemDetected;
+    final highSeverity = reports.where((r) => r.severity.toLowerCase() == 'high' || r.severity.toLowerCase() == 'critical').length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _field.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.analytics_rounded, size: 18, color: _accentAForeground),
+              const SizedBox(width: 8),
+              Text(
+                'History Logs Summary & Filter Analytics',
+                style: TextStyle(
+                  color: _text,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              if (_historyLogFilter != 'all')
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: _accentAForeground,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  ),
+                  icon: const Icon(Icons.clear_rounded, size: 14),
+                  label: const Text('Reset Filter', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  onPressed: () => setState(() => _historyLogFilter = 'all'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _summaryMetricItem(
+                  label: 'Total Archived',
+                  value: '$total',
+                  color: const Color(0xFF0EA5E9),
+                  icon: Icons.assignment_turned_in_rounded,
+                  isSelected: _historyLogFilter == 'all',
+                  onTap: () => setState(() => _historyLogFilter = 'all'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _summaryMetricItem(
+                  label: 'System Detected',
+                  value: '$systemDetected',
+                  color: const Color(0xFF10B981),
+                  icon: Icons.computer_rounded,
+                  isSelected: _historyLogFilter == 'system',
+                  onTap: () => setState(() => _historyLogFilter = 'system'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _summaryMetricItem(
+                  label: 'Student Reported',
+                  value: '$studentReported',
+                  color: const Color(0xFF8B5CF6),
+                  icon: Icons.person_rounded,
+                  isSelected: _historyLogFilter == 'student',
+                  onTap: () => setState(() => _historyLogFilter = 'student'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _summaryMetricItem(
+                  label: 'High Severity',
+                  value: '$highSeverity',
+                  color: const Color(0xFFEF4444),
+                  icon: Icons.warning_rounded,
+                  isSelected: _historyLogFilter == 'high_severity',
+                  onTap: () => setState(() => _historyLogFilter = 'high_severity'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryMetricItem({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.12) : _card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? color : _border,
+              width: isSelected ? 1.8 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: TextStyle(
+                        color: _text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isSelected ? color : _sub,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
