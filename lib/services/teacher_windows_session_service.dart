@@ -241,6 +241,41 @@ class TeacherWindowsSessionService {
     }
   }
 
+  /// Explicitly ends the current automatic Teacher attendance/session record.
+  ///
+  /// This is called when the Teacher closes the application normally so the
+  /// database receives an exact logout time. If the app crashes or the PC
+  /// loses power, the existing heartbeat expiry still closes the session from
+  /// the last successful heartbeat.
+  Future<void> endRecordedSession() async {
+    if (!hasRecordedTeacherSession) return;
+
+    final sessionId = _sessionId;
+    final sessionKey = _sessionKey;
+
+    // Stop new heartbeats before asking the server to close the row.
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+
+    try {
+      await ApiClient.instance.postJson(
+        ApiEndpoints.teacherWindowsLogout,
+        authenticated: false,
+        body: {
+          'session_id': sessionId,
+          'session_key': sessionKey,
+        },
+      );
+    } catch (_) {
+      // If the LAN/server is unavailable, do not block application shutdown.
+      // The server's stale-session cleanup will use the last heartbeat as the
+      // fallback logout time.
+    } finally {
+      _sessionId = '';
+      _sessionKey = '';
+    }
+  }
+
   void dispose() {
     _heartbeatTimer?.cancel();
     _retryTimer?.cancel();

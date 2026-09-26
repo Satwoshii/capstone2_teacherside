@@ -191,6 +191,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     _timer = null;
 
     try {
+      // Close the automatic Teacher attendance row first so logout_at is
+      // written immediately instead of waiting for heartbeat expiry.
+      await TeacherWindowsSessionService.instance.endRecordedSession();
       await TeacherService.instance.logout();
     } catch (_) {}
 

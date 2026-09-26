@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -400,11 +401,9 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
         final pc = r.pcId.toLowerCase();
         final name = r.studentName.toLowerCase();
         final id = r.studentId.toLowerCase();
-        final sec = r.courseSection.toLowerCase();
         return pc.contains(query) ||
             name.contains(query) ||
-            id.contains(query) ||
-            sec.contains(query);
+            id.contains(query);
       }
       return true;
     }).toList();
@@ -757,10 +756,37 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     List<StudentAttendanceRecord> filtered,
     List<StudentAttendanceRecord> allRecords,
   ) {
-    // Map registered workstations from room
-    final Map<String, StudentAttendanceRecord> activeRecordMap = {
-      for (final r in allRecords) r.pcId.toLowerCase(): r,
-    };
+    // Map each PC to the record that should currently occupy the workstation.
+    //
+    // Do NOT trust list order here. Older Syswatch builds stored some timestamps
+    // using Manila wall-clock time without an offset, so a historical signed-out
+    // row can sort ahead of the real active row. The grid must always prefer an
+    // occupied attendance state (Active / Present / Late) for the same PC.
+    // If both records have the same occupancy state, keep the newest login.
+    final Map<String, StudentAttendanceRecord> activeRecordMap = {};
+    for (final record in allRecords) {
+      final key = record.pcId.trim().toLowerCase();
+      if (key.isEmpty) continue;
+
+      final current = activeRecordMap[key];
+      if (current == null) {
+        activeRecordMap[key] = record;
+        continue;
+      }
+
+      final recordOccupied = record.isPresent;
+      final currentOccupied = current.isPresent;
+
+      if (recordOccupied && !currentOccupied) {
+        activeRecordMap[key] = record;
+        continue;
+      }
+
+      if (recordOccupied == currentOccupied &&
+          record.loginTime.isAfter(current.loginTime)) {
+        activeRecordMap[key] = record;
+      }
+    }
 
     final pcSlots = <Map<String, dynamic>>[];
 
@@ -948,7 +974,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                             ),
                             const SizedBox(height: 1),
                             Text(
-                              'ID: ${record.studentId} · ${record.courseSection}',
+                              'ID: ${record.studentId}',
                               style: TextStyle(color: _sub, fontSize: 11),
                             ),
                           ],
@@ -1057,7 +1083,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 1100),
+            constraints: const BoxConstraints(minWidth: 980),
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(_field),
               dividerThickness: 1,
@@ -1067,7 +1093,6 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                 DataColumn(label: Text('PC ID', style: _tableHeaderStyle())),
                 DataColumn(label: Text('Student ID', style: _tableHeaderStyle())),
                 DataColumn(label: Text('Student Name', style: _tableHeaderStyle())),
-                DataColumn(label: Text('Course / Sec', style: _tableHeaderStyle())),
                 DataColumn(label: Text('Subject', style: _tableHeaderStyle())),
                 DataColumn(label: Text('Time In', style: _tableHeaderStyle())),
                 DataColumn(label: Text('Duration', style: _tableHeaderStyle())),
@@ -1102,7 +1127,6 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                           ],
                         ),
                       ),
-                      DataCell(Text(r.courseSection, style: TextStyle(color: _sub, fontSize: 12))),
                       DataCell(Text(r.subject, style: TextStyle(color: _sub, fontSize: 12))),
                       DataCell(Text(r.formattedLoginTime, style: TextStyle(color: _text, fontSize: 12))),
                       DataCell(Text(r.formattedDuration, style: TextStyle(color: _sub, fontSize: 12, fontWeight: FontWeight.w600))),
@@ -1318,7 +1342,12 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                     ],
                   ),
                   const Divider(height: 28),
-                  _detailGridRow('Course & Section', record.courseSection, 'Subject', record.subject),
+                  _detailGridRow(
+                    'Subject',
+                    record.subject,
+                    'Student Email',
+                    record.studentEmail.trim().isEmpty ? 'Not available' : record.studentEmail,
+                  ),
                   const SizedBox(height: 12),
                   _detailGridRow('Login Time', record.formattedLoginTime, 'Active Duration', record.formattedDuration),
                   const SizedBox(height: 12),
@@ -1456,7 +1485,6 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     final studentIdController = TextEditingController();
     final nameController = TextEditingController();
     final emailController = TextEditingController();
-    final sectionController = TextEditingController(text: 'BSIT 3-A');
     final subjectController = TextEditingController(text: 'IT 312 - Systems Admin');
     final remarksController = TextEditingController();
     AttendanceStatus status = AttendanceStatus.active;
@@ -1504,52 +1532,19 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Student ID', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    controller: studentIdController,
-                                    style: TextStyle(color: _text, fontSize: 13),
-                                    decoration: InputDecoration(
-                                      hintText: 'e.g., 2023-10024',
-                                      filled: true,
-                                      fillColor: _field,
-                                      isDense: true,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                    ),
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Course & Section', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    controller: sectionController,
-                                    style: TextStyle(color: _text, fontSize: 13),
-                                    decoration: InputDecoration(
-                                      hintText: 'e.g., BSIT 3-A',
-                                      filled: true,
-                                      fillColor: _field,
-                                      isDense: true,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                    ),
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        Text('Student ID', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: studentIdController,
+                          style: TextStyle(color: _text, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'e.g., 2023-10024',
+                            filled: true,
+                            fillColor: _field,
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                         ),
                         const SizedBox(height: 12),
                         Text('Student Full Name', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
@@ -1565,6 +1560,27 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                           ),
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Student Email (Optional)', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          style: TextStyle(color: _text, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'e.g., student@students.nu-clark.edu.ph',
+                            filled: true,
+                            fillColor: _field,
+                            isDense: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                          ),
+                          validator: (v) {
+                            final value = (v ?? '').trim();
+                            if (value.isEmpty) return null;
+                            if (!value.contains('@') || !value.contains('.')) return 'Enter a valid email or leave blank';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 12),
                         Text('Subject / Class', style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w700)),
@@ -1633,9 +1649,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                 FilledButton(
                   onPressed: () async {
                     if (formKey.currentState?.validate() == true) {
-                      final email = emailController.text.trim().isNotEmpty
-                          ? emailController.text.trim()
-                          : '${studentIdController.text.trim()}@student.edu.ph';
+                      final email = emailController.text.trim();
 
                       final messenger = ScaffoldMessenger.of(context);
                       await StudentAttendanceService.instance.checkInStudent(
@@ -1643,7 +1657,7 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                         studentId: studentIdController.text,
                         studentName: nameController.text,
                         studentEmail: email,
-                        courseSection: sectionController.text,
+                        courseSection: 'Not set',
                         subject: subjectController.text,
                         status: status,
                         remarks: remarksController.text,
@@ -1723,23 +1737,74 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
             onPressed: () => Navigator.pop(ctx),
             child: Text('Close', style: TextStyle(color: _sub)),
           ),
-          FilledButton.icon(
+          OutlinedButton.icon(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: csvData));
-              Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Attendance CSV copied to clipboard!'),
+                  content: Text('Attendance CSV copied to clipboard.'),
                   backgroundColor: Color(0xFF10B981),
                 ),
               );
             },
             icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy to Clipboard'),
+            label: const Text('Copy'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              try {
+                final savedPath = await _saveAttendanceCsv(csvData);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('CSV exported to: $savedPath'),
+                      backgroundColor: const Color(0xFF10B981),
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('CSV export failed: ${cleanError(error)}'),
+                      backgroundColor: const Color(0xFFEF4444),
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('Save CSV'),
           ),
         ],
       ),
     );
+  }
+
+
+  Future<String> _saveAttendanceCsv(String csvData) async {
+    final profile = Platform.environment['USERPROFILE'];
+    final downloadsDir = profile != null && profile.trim().isNotEmpty
+        ? Directory('$profile/Downloads')
+        : Directory.current;
+
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final now = DateTime.now();
+    final stamp = '${now.year.toString().padLeft(4, '0')}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+    final safeRoom = widget.room.roomName.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final file = File('${downloadsDir.path}/Syswatch_Attendance_Room_${safeRoom}_$stamp.csv');
+    await file.writeAsString(csvData, flush: true);
+    return file.path;
   }
 
   Widget _iconTile({

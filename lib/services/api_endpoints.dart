@@ -15,6 +15,8 @@ class ApiEndpoints {
       'staff_sessions/windows_auto_login.php';
   static const String teacherWindowsHeartbeat =
       'staff_sessions/windows_heartbeat.php';
+  static const String teacherWindowsLogout =
+      'staff_sessions/windows_logout.php';
 
   // Teacher dashboard & features.
   static const String teacherOverview = 'teacher/overview.php';

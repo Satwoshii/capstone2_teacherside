@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -70,6 +71,7 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
     final future = StudentAttendanceService.instance.getAttendance(
       room: widget.room,
       forceRefresh: force,
+      includeHistory: true,
     );
     if (!silent) {
       setState(() {
@@ -362,11 +364,9 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
         final pc = r.pcId.toLowerCase();
         final name = r.studentName.toLowerCase();
         final id = r.studentId.toLowerCase();
-        final sec = r.courseSection.toLowerCase();
         return pc.contains(query) ||
             name.contains(query) ||
-            id.contains(query) ||
-            sec.contains(query);
+            id.contains(query);
       }
       return true;
     }).toList();
@@ -710,7 +710,7 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
             columns: [
               DataColumn(label: Text('PC / WS', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
               DataColumn(label: Text('Student Name & ID', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
-              DataColumn(label: Text('Section & Subject', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
+              DataColumn(label: Text('Subject', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
               DataColumn(label: Text('Time In (Login)', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
               DataColumn(label: Text('Time Out (Logout)', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
               DataColumn(label: Text('Duration', style: TextStyle(color: _text, fontWeight: FontWeight.w800))),
@@ -787,29 +787,15 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
                       ],
                     ),
                   ),
-                  // Section & Subject
+                  // Subject
                   DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          r.courseSection,
-                          style: TextStyle(
-                            color: _text,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          r.subject,
-                          style: TextStyle(
-                            color: _sub,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      r.subject,
+                      style: TextStyle(
+                        color: _text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   // Time In (Login)
@@ -949,23 +935,63 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
             ),
             icon: const Icon(Icons.download_rounded, size: 18),
             label: const Text('Download CSV'),
-            onPressed: () {
-              Navigator.pop(ctx);
+            onPressed: () async {
               final csv = StudentAttendanceService.instance.exportCsv(roomName: widget.room.roomName);
-              Clipboard.setData(ClipboardData(text: csv));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Attendance logs CSV copied to clipboard!'),
-                  backgroundColor: const Color(0xFF10B981),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              try {
+                final savedPath = await _saveAttendanceCsv(csv, prefix: 'Syswatch_Attendance_Logs');
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Attendance logs exported to: $savedPath'),
+                      backgroundColor: const Color(0xFF10B981),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              } catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('CSV export failed: ${cleanError(error)}'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
       ),
     );
+  }
+
+
+  Future<String> _saveAttendanceCsv(String csvData, {required String prefix}) async {
+    final profile = Platform.environment['USERPROFILE'];
+    final downloadsDir = profile != null && profile.trim().isNotEmpty
+        ? Directory('$profile/Downloads')
+        : Directory.current;
+
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final now = DateTime.now();
+    final stamp = '${now.year.toString().padLeft(4, '0')}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+    final safeRoom = widget.room.roomName.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final file = File('${downloadsDir.path}/${prefix}_Room_${safeRoom}_$stamp.csv');
+    await file.writeAsString(csvData, flush: true);
+    return file.path;
   }
 
   Widget _errorState(String message) {
