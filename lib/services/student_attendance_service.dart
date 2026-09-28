@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../models/lab_overview.dart';
 import '../models/student_attendance.dart';
 import 'api_client.dart';
@@ -170,11 +172,35 @@ class StudentAttendanceService {
     );
   }
 
-  String exportCsv({required String roomName}) {
+  String exportCsv({
+    required String roomName,
+    String roomFilter = 'All Rooms',
+    TimeFilterOption timeFilter = TimeFilterOption.allTime,
+    DateTimeRange? customDateRange,
+  }) {
+    final filtered = _records.where((r) {
+      return r.matchesRoomAndRange(
+        roomFilter: roomFilter,
+        timeFilter: timeFilter,
+        customDateRange: customDateRange,
+        currentRoomName: roomName,
+      );
+    }).toList();
+
+    String timeFilterLabel = timeFilter.label;
+    if (timeFilter == TimeFilterOption.custom && customDateRange != null) {
+      final s = customDateRange.start;
+      final e = customDateRange.end;
+      final sStr = '${s.year}-${s.month.toString().padLeft(2, '0')}-${s.day.toString().padLeft(2, '0')}';
+      final eStr = '${e.year}-${e.month.toString().padLeft(2, '0')}-${e.day.toString().padLeft(2, '0')}';
+      timeFilterLabel = 'Custom ($sStr to $eStr)';
+    }
+
     return exportCsvForRecords(
-      roomName: roomName,
-      records: _records,
-      timeFilterLabel: 'All Records',
+      roomName: roomFilter == 'All Rooms' || roomFilter.trim().isEmpty ? roomName : roomFilter,
+      records: filtered,
+      timeFilterLabel: timeFilterLabel,
+      customDateRange: customDateRange,
     );
   }
 
@@ -182,22 +208,30 @@ class StudentAttendanceService {
     required String roomName,
     required List<StudentAttendanceRecord> records,
     String timeFilterLabel = 'All Time',
+    DateTimeRange? customDateRange,
   }) {
     final buffer = StringBuffer();
     final now = DateTime.now();
     buffer.writeln('# SysWatch Laboratory Student Attendance Report');
-    buffer.writeln('# Room: ${_csvCell(roomName)}');
-    buffer.writeln('# Time Range: ${_csvCell(timeFilterLabel)}');
+    buffer.writeln('# Room Filter: ${_csvCell(roomName.isEmpty ? "All Rooms" : roomName)}');
+    buffer.writeln('# Time Filter: ${_csvCell(timeFilterLabel)}');
+    if (customDateRange != null) {
+      final s = customDateRange.start;
+      final e = customDateRange.end;
+      buffer.writeln('# Date Range: ${s.year}-${s.month.toString().padLeft(2, '0')}-${s.day.toString().padLeft(2, '0')} to ${e.year}-${e.month.toString().padLeft(2, '0')}-${e.day.toString().padLeft(2, '0')}');
+    }
     buffer.writeln('# Date Generated: ${_csvCell(now.toLocal().toString())}');
     buffer.writeln('# Total Exported Records: ${records.length}');
-    buffer.writeln('PC ID,Student ID,Student Name,Email,Subject,Date,Time In,Time Out,Duration,Status,IP Address,Remarks');
+    buffer.writeln('PC ID,Room,Student ID,Student Name,Email,Course & Section,Subject,Date,Time In,Time Out,Duration,Status,IP Address,Remarks');
 
     for (final r in records) {
       final line = [
         r.pcId,
+        r.roomName.isNotEmpty ? r.roomName : roomName,
         r.studentId,
         r.studentName,
         r.studentEmail,
+        r.courseSection,
         r.subject,
         r.formattedDate,
         r.formattedLoginTime,

@@ -37,6 +37,9 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
   final TextEditingController _searchController = TextEditingController();
   AttendanceStatus? _statusFilter;
   String _subjectFilter = 'All Subjects';
+  String _roomFilter = 'All Rooms';
+  TimeFilterOption _timeFilter = TimeFilterOption.allTime;
+  DateTimeRange? _customDateRange;
   DateTime _now = DateTime.now();
 
   bool get _dark => Theme.of(context).brightness == Brightness.dark;
@@ -57,8 +60,10 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
 
   bool get _hasActiveFilters =>
       _statusFilter != null ||
-          _subjectFilter != 'All Subjects' ||
-          _searchController.text.trim().isNotEmpty;
+      _subjectFilter != 'All Subjects' ||
+      _roomFilter != 'All Rooms' ||
+      _timeFilter != TimeFilterOption.allTime ||
+      _searchController.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -103,7 +108,332 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     setState(() {
       _statusFilter = null;
       _subjectFilter = 'All Subjects';
+      _roomFilter = 'All Rooms';
+      _timeFilter = TimeFilterOption.allTime;
+      _customDateRange = null;
     });
+  }
+
+  Future<void> _pickCustomDateTimeRange() async {
+    final picked = await _showCustomDateTimeRangePopup(initialRange: _customDateRange);
+    if (picked != null) {
+      setState(() {
+        _customDateRange = picked;
+        _timeFilter = TimeFilterOption.custom;
+      });
+    }
+  }
+
+  Future<DateTimeRange?> _showCustomDateTimeRangePopup({DateTimeRange? initialRange}) async {
+    final now = DateTime.now();
+    DateTime startDate = initialRange?.start ?? DateTime(now.year, now.month, now.day, 0, 0);
+    TimeOfDay startTime = TimeOfDay(hour: startDate.hour, minute: startDate.minute);
+
+    DateTime endDate = initialRange?.end ?? DateTime(now.year, now.month, now.day, 23, 59);
+    TimeOfDay endTime = TimeOfDay(hour: endDate.hour, minute: endDate.minute);
+
+    return showDialog<DateTimeRange>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDlgState) {
+            String formatDate(DateTime dt) {
+              final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+            }
+
+            String formatTime(TimeOfDay tod) {
+              final h = tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
+              final ampm = tod.hour >= 12 ? 'PM' : 'AM';
+              final m = tod.minute.toString().padLeft(2, '0');
+              return '$h:$m $ampm';
+            }
+
+            return AlertDialog(
+              backgroundColor: _card,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _accentAForeground.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.event_available_rounded, color: _accentAForeground, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Custom Date & Time Range',
+                          style: TextStyle(color: _text, fontWeight: FontWeight.w800, fontSize: 17),
+                        ),
+                        Text(
+                          'Select starting and ending date & time',
+                          style: TextStyle(color: _sub, fontSize: 11.5, fontWeight: FontWeight.normal),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Start Date & Time
+                    Text('START DATE & TIME', style: TextStyle(color: _sub, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: InkWell(
+                            onTap: () async {
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: startDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(now.year + 2),
+                              );
+                              if (pickedDate != null) {
+                                setDlgState(() => startDate = pickedDate);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _field,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today_rounded, size: 16, color: _accentAForeground),
+                                  const SizedBox(width: 8),
+                                  Text(formatDate(startDate), style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: InkWell(
+                            onTap: () async {
+                              final pickedTime = await showTimePicker(
+                                context: context,
+                                initialTime: startTime,
+                              );
+                              if (pickedTime != null) {
+                                setDlgState(() => startTime = pickedTime);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _field,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.access_time_rounded, size: 16, color: _accentAForeground),
+                                  const SizedBox(width: 8),
+                                  Text(formatTime(startTime), style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // End Date & Time
+                    Text('END DATE & TIME', style: TextStyle(color: _sub, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: InkWell(
+                            onTap: () async {
+                              final pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: endDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(now.year + 2),
+                              );
+                              if (pickedDate != null) {
+                                setDlgState(() => endDate = pickedDate);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _field,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today_rounded, size: 16, color: _accentAForeground),
+                                  const SizedBox(width: 8),
+                                  Text(formatDate(endDate), style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: InkWell(
+                            onTap: () async {
+                              final pickedTime = await showTimePicker(
+                                context: context,
+                                initialTime: endTime,
+                              );
+                              if (pickedTime != null) {
+                                setDlgState(() => endTime = pickedTime);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: _field,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.access_time_rounded, size: 16, color: _accentAForeground),
+                                  const SizedBox(width: 8),
+                                  Text(formatTime(endTime), style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Quick Presets
+                    Text('QUICK PRESETS', style: TextStyle(color: _sub, fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _presetChip('Today', () {
+                          setDlgState(() {
+                            startDate = DateTime(now.year, now.month, now.day, 0, 0);
+                            startTime = const TimeOfDay(hour: 0, minute: 0);
+                            endDate = DateTime(now.year, now.month, now.day, 23, 59);
+                            endTime = const TimeOfDay(hour: 23, minute: 59);
+                          });
+                        }),
+                        _presetChip('Last 24 Hours', () {
+                          final prev = now.subtract(const Duration(hours: 24));
+                          setDlgState(() {
+                            startDate = DateTime(prev.year, prev.month, prev.day, prev.hour, prev.minute);
+                            startTime = TimeOfDay(hour: prev.hour, minute: prev.minute);
+                            endDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+                            endTime = TimeOfDay(hour: now.hour, minute: now.minute);
+                          });
+                        }),
+                        _presetChip('Last 7 Days', () {
+                          final prev = now.subtract(const Duration(days: 7));
+                          setDlgState(() {
+                            startDate = DateTime(prev.year, prev.month, prev.day, 0, 0);
+                            startTime = const TimeOfDay(hour: 0, minute: 0);
+                            endDate = DateTime(now.year, now.month, now.day, 23, 59);
+                            endTime = const TimeOfDay(hour: 23, minute: 59);
+                          });
+                        }),
+                        _presetChip('This Month', () {
+                          setDlgState(() {
+                            startDate = DateTime(now.year, now.month, 1, 0, 0);
+                            startTime = const TimeOfDay(hour: 0, minute: 0);
+                            endDate = DateTime(now.year, now.month, now.day, 23, 59);
+                            endTime = const TimeOfDay(hour: 23, minute: 59);
+                          });
+                        }),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, null),
+                  child: Text('Cancel', style: TextStyle(color: _sub)),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    final startFull = DateTime(startDate.year, startDate.month, startDate.day, startTime.hour, startTime.minute);
+                    final endFull = DateTime(endDate.year, endDate.month, endDate.day, endTime.hour, endTime.minute);
+                    if (endFull.isBefore(startFull)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('End date/time must be after start date/time.'),
+                          backgroundColor: Color(0xFFEF4444),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx, DateTimeRange(start: startFull, end: endFull));
+                  },
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Apply Range'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _presetChip(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: _field,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _border),
+        ),
+        child: Text(label, style: TextStyle(color: _text, fontSize: 11, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  String _formatDateTimeRangeLabel(DateTimeRange range) {
+    final s = range.start;
+    final e = range.end;
+    final sTime = _formatTimeOfDay(TimeOfDay(hour: s.hour, minute: s.minute));
+    final eTime = _formatTimeOfDay(TimeOfDay(hour: e.hour, minute: e.minute));
+    return '${s.month}/${s.day} $sTime - ${e.month}/${e.day} $eTime';
+  }
+
+  String _formatTimeOfDay(TimeOfDay tod) {
+    final h = tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
+    final ampm = tod.hour >= 12 ? 'PM' : 'AM';
+    final m = tod.minute.toString().padLeft(2, '0');
+    return '$h:$m $ampm';
   }
 
   @override
@@ -462,13 +792,23 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
       if (_subjectFilter != 'All Subjects' && r.subject != _subjectFilter) {
         return false;
       }
+      if (!r.matchesRoomAndRange(
+        roomFilter: _roomFilter,
+        timeFilter: _timeFilter,
+        customDateRange: _customDateRange,
+        currentRoomName: widget.room.roomName,
+      )) {
+        return false;
+      }
       if (query.isNotEmpty) {
         final pc = r.pcId.toLowerCase();
         final name = r.studentName.toLowerCase();
         final id = r.studentId.toLowerCase();
+        final rm = (r.roomName.isNotEmpty ? r.roomName : widget.room.roomName).toLowerCase();
         return pc.contains(query) ||
             name.contains(query) ||
-            id.contains(query);
+            id.contains(query) ||
+            rm.contains(query);
       }
       return true;
     }).toList();
@@ -657,6 +997,13 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
       Set<String> subjects,
       List<StudentAttendanceRecord> all,
       ) {
+    final availableRooms = <String>{
+      'All Rooms',
+      widget.room.roomName,
+      ...all.map((r) => r.roomName).where((r) => r.trim().isNotEmpty),
+      '101', '102', '103', '104', '201', '202',
+    }.toList();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -676,12 +1023,12 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     SizedBox(
-                      width: 300,
+                      width: 260,
                       child: TextField(
                         controller: _searchController,
                         style: TextStyle(color: _text, fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: 'Search student name, ID, or PC…',
+                          hintText: 'Search student, ID, PC…',
                           hintStyle: TextStyle(color: _sub, fontSize: 13),
                           prefixIcon: Icon(Icons.search_rounded,
                               color: _sub, size: 19),
@@ -705,6 +1052,94 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
                         ),
                       ),
                     ),
+                    // Room Number Filter Dropdown
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: _field,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: availableRooms.contains(_roomFilter) ? _roomFilter : 'All Rooms',
+                          dropdownColor: _card,
+                          icon: Icon(Icons.expand_more_rounded, color: _sub),
+                          style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+                          items: availableRooms
+                              .map((rm) => DropdownMenuItem(
+                              value: rm,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.meeting_room_rounded, size: 15, color: _sub),
+                                  const SizedBox(width: 6),
+                                  Text(rm == 'All Rooms' ? 'All Rooms' : 'Room $rm',
+                                      style: TextStyle(color: _text)),
+                                ],
+                              )))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _roomFilter = v);
+                          },
+                        ),
+                      ),
+                    ),
+                    // Time Filter Dropdown
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: _field,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<TimeFilterOption>(
+                          value: _timeFilter,
+                          dropdownColor: _card,
+                          icon: Icon(Icons.expand_more_rounded, color: _sub),
+                          style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+                          items: TimeFilterOption.values
+                              .map((tf) => DropdownMenuItem(
+                              value: tf,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.calendar_today_rounded, size: 15, color: _sub),
+                                  const SizedBox(width: 6),
+                                  Text(tf.label,
+                                      style: TextStyle(color: _text)),
+                                ],
+                              )))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                _timeFilter = v;
+                              });
+                              if (v == TimeFilterOption.custom && _customDateRange == null) {
+                                _pickCustomDateTimeRange();
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    if (_timeFilter == TimeFilterOption.custom)
+                      OutlinedButton.icon(
+                        onPressed: _pickCustomDateTimeRange,
+                        icon: const Icon(Icons.date_range_rounded, size: 16),
+                        label: Text(
+                          _customDateRange != null
+                              ? _formatDateTimeRangeLabel(_customDateRange!)
+                              : 'Select Date & Time',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _accentAForeground,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    // Subject Dropdown
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
@@ -1653,107 +2088,308 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
   }
 
   void _showExportDialog() {
-    final csvData = StudentAttendanceService.instance.exportCsv(
-      roomName: widget.room.roomName,
-    );
+    String dialogRoomFilter = _roomFilter != 'All Rooms' ? _roomFilter : 'All Rooms';
+    TimeFilterOption dialogTimeFilter = _timeFilter;
+    DateTimeRange? dialogCustomRange = _customDateRange;
+
+    final allRecords = StudentAttendanceService.instance.currentRecords;
+    final availableRooms = <String>{
+      'All Rooms',
+      widget.room.roomName,
+      ...allRecords.map((r) => r.roomName).where((r) => r.trim().isNotEmpty),
+      '101', '102', '103', '104', '201', '202',
+    }.toList();
 
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _card,
-        title: Row(
-          children: [
-            Icon(Icons.download_rounded, color: _accentAForeground),
-            const SizedBox(width: 10),
-            Text('Export Attendance CSV Report',
-                style: TextStyle(color: _text, fontWeight: FontWeight.w800)),
-          ],
-        ),
-        content: SizedBox(
-          width: 580,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Copy or download the raw CSV data for Laboratory ${widget.room.roomName}:',
-                style: TextStyle(color: _sub, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                height: 240,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _field,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _border),
-                ),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    csvData,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      color: _text,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final csvData = StudentAttendanceService.instance.exportCsv(
+              roomName: widget.room.roomName,
+              roomFilter: dialogRoomFilter,
+              timeFilter: dialogTimeFilter,
+              customDateRange: dialogCustomRange,
+            );
+
+            final matchingRecords = allRecords.where((r) {
+              return r.matchesRoomAndRange(
+                roomFilter: dialogRoomFilter,
+                timeFilter: dialogTimeFilter,
+                customDateRange: dialogCustomRange,
+                currentRoomName: widget.room.roomName,
+              );
+            }).length;
+
+            return AlertDialog(
+              backgroundColor: _card,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _accentAForeground.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.file_download_rounded, color: _accentAForeground, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Export Attendance CSV Data',
+                          style: TextStyle(color: _text, fontWeight: FontWeight.w800, fontSize: 17),
+                        ),
+                        Text(
+                          'Select room and time filters for the exported report',
+                          style: TextStyle(color: _sub, fontSize: 11.5, fontWeight: FontWeight.normal),
+                        ),
+                      ],
                     ),
                   ),
+                ],
+              ),
+              content: SizedBox(
+                width: 620,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: _field,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              // Room Number Picker
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Room Number Filter', style: TextStyle(color: _sub, fontSize: 11, fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: _card,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: _border),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: availableRooms.contains(dialogRoomFilter) ? dialogRoomFilter : 'All Rooms',
+                                          isExpanded: true,
+                                          dropdownColor: _card,
+                                          icon: Icon(Icons.expand_more_rounded, color: _sub),
+                                          style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                          items: availableRooms.map((rm) {
+                                            return DropdownMenuItem<String>(
+                                              value: rm,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.meeting_room_rounded, size: 15, color: _sub),
+                                                  const SizedBox(width: 8),
+                                                  Text(rm == 'All Rooms' ? 'All Rooms' : 'Room $rm'),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setDialogState(() {
+                                                dialogRoomFilter = val;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              // Time Filter Picker
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Time Filter', style: TextStyle(color: _sub, fontSize: 11, fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: _card,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: _border),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<TimeFilterOption>(
+                                          value: dialogTimeFilter,
+                                          isExpanded: true,
+                                          dropdownColor: _card,
+                                          icon: Icon(Icons.expand_more_rounded, color: _sub),
+                                          style: TextStyle(color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+                                          items: TimeFilterOption.values.map((tf) {
+                                            return DropdownMenuItem<TimeFilterOption>(
+                                              value: tf,
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.calendar_today_rounded, size: 15, color: _sub),
+                                                  const SizedBox(width: 8),
+                                                  Text(tf.label),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) async {
+                                            if (val != null) {
+                                              if (val == TimeFilterOption.custom) {
+                                                final picked = await _showCustomDateTimeRangePopup(initialRange: dialogCustomRange);
+                                                if (picked != null) {
+                                                  setDialogState(() {
+                                                    dialogTimeFilter = TimeFilterOption.custom;
+                                                    dialogCustomRange = picked;
+                                                  });
+                                                }
+                                              } else {
+                                                setDialogState(() {
+                                                  dialogTimeFilter = val;
+                                                });
+                                              }
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (dialogTimeFilter == TimeFilterOption.custom && dialogCustomRange != null) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Text(
+                                  'Selected: ${_formatDateTimeRangeLabel(dialogCustomRange!)}',
+                                  style: TextStyle(color: _accentAForeground, fontSize: 11.5, fontWeight: FontWeight.w700),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () async {
+                                    final picked = await _showCustomDateTimeRangePopup(initialRange: dialogCustomRange);
+                                    if (picked != null) {
+                                      setDialogState(() {
+                                        dialogCustomRange = picked;
+                                      });
+                                    }
+                                  },
+                                  child: const Text('Change Date & Time', style: TextStyle(fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: _sub),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Report includes $matchingRecords matching record${matchingRecords == 1 ? '' : 's'}.',
+                          style: TextStyle(color: _sub, fontSize: 11.5, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      height: 200,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _field,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _border),
+                      ),
+                      child: SingleChildScrollView(
+                        child: SelectableText(
+                          csvData,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            color: _text,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close', style: TextStyle(color: _sub)),
-          ),
-          OutlinedButton.icon(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: csvData));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Attendance CSV copied to clipboard.'),
-                  backgroundColor: Color(0xFF10B981),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Close', style: TextStyle(color: _sub)),
                 ),
-              );
-            },
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              try {
-                final savedPath = await _saveAttendanceCsv(csvData);
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('CSV exported to: $savedPath'),
-                      backgroundColor: const Color(0xFF10B981),
-                      duration: const Duration(seconds: 5),
-                    ),
-                  );
-                }
-              } catch (error) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('CSV export failed: ${cleanError(error)}'),
-                      backgroundColor: const Color(0xFFEF4444),
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.download_rounded, size: 16),
-            label: const Text('Save CSV'),
-          ),
-        ],
-      ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: csvData));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Attendance CSV copied to clipboard.'),
+                        backgroundColor: Color(0xFF10B981),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 16),
+                  label: const Text('Copy'),
+                ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    try {
+                      final savedPath = await _saveAttendanceCsv(csvData, roomName: dialogRoomFilter);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('CSV exported to: $savedPath'),
+                            backgroundColor: const Color(0xFF10B981),
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    } catch (error) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('CSV export failed: ${cleanError(error)}'),
+                            backgroundColor: const Color(0xFFEF4444),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Save CSV'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Future<String> _saveAttendanceCsv(String csvData) async {
+  Future<String> _saveAttendanceCsv(String csvData, {String roomName = ''}) async {
     final profile = Platform.environment['USERPROFILE'];
     final downloadsDir = profile != null && profile.trim().isNotEmpty
         ? Directory('$profile/Downloads')
@@ -1770,8 +2406,9 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
         '${now.hour.toString().padLeft(2, '0')}'
         '${now.minute.toString().padLeft(2, '0')}'
         '${now.second.toString().padLeft(2, '0')}';
+    final targetRoom = roomName.isNotEmpty ? roomName : widget.room.roomName;
     final safeRoom =
-    widget.room.roomName.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    targetRoom.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
     final file = File(
         '${downloadsDir.path}/Syswatch_Attendance_Room_${safeRoom}_$stamp.csv');
     await file.writeAsString(csvData, flush: true);

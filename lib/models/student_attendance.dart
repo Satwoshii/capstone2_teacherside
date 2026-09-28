@@ -65,8 +65,21 @@ enum AttendanceStatus {
   }
 }
 
+enum TimeFilterOption {
+  allTime('All Time'),
+  today('Today'),
+  yesterday('Yesterday'),
+  thisWeek('This Week'),
+  thisMonth('This Month'),
+  custom('Custom Date Range');
+
+  final String label;
+  const TimeFilterOption(this.label);
+}
+
 class StudentAttendanceRecord {
   final String id;
+  final String roomName;
   final String studentId;
   final String studentName;
   final String studentEmail;
@@ -83,6 +96,7 @@ class StudentAttendanceRecord {
 
   const StudentAttendanceRecord({
     required this.id,
+    this.roomName = '',
     required this.studentId,
     required this.studentName,
     required this.studentEmail,
@@ -150,6 +164,7 @@ class StudentAttendanceRecord {
 
   StudentAttendanceRecord copyWith({
     String? id,
+    String? roomName,
     String? studentId,
     String? studentName,
     String? studentEmail,
@@ -166,6 +181,7 @@ class StudentAttendanceRecord {
   }) {
     return StudentAttendanceRecord(
       id: id ?? this.id,
+      roomName: roomName ?? this.roomName,
       studentId: studentId ?? this.studentId,
       studentName: studentName ?? this.studentName,
       studentEmail: studentEmail ?? this.studentEmail,
@@ -182,6 +198,62 @@ class StudentAttendanceRecord {
     );
   }
 
+  bool matchesRoomAndRange({
+    required String roomFilter,
+    required TimeFilterOption timeFilter,
+    DateTimeRange? customDateRange,
+    String currentRoomName = '',
+  }) {
+    if (roomFilter != 'All Rooms' && roomFilter.trim().isNotEmpty) {
+      final recordRoom = roomName.isNotEmpty ? roomName : currentRoomName;
+      if (recordRoom.isNotEmpty &&
+          recordRoom.toLowerCase() != roomFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    final now = DateTime.now();
+    final local = loginTime.toLocal();
+
+    switch (timeFilter) {
+      case TimeFilterOption.allTime:
+        return true;
+      case TimeFilterOption.today:
+        return local.year == now.year &&
+            local.month == now.month &&
+            local.day == now.day;
+      case TimeFilterOption.yesterday:
+        final yesterday = now.subtract(const Duration(days: 1));
+        return local.year == yesterday.year &&
+            local.month == yesterday.month &&
+            local.day == yesterday.day;
+      case TimeFilterOption.thisWeek:
+        final startOfWeek = DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1));
+        return local.isAfter(startOfWeek) ||
+            (local.year == startOfWeek.year &&
+                local.month == startOfWeek.month &&
+                local.day == startOfWeek.day);
+      case TimeFilterOption.thisMonth:
+        return local.year == now.year && local.month == now.month;
+      case TimeFilterOption.custom:
+        if (customDateRange == null) return true;
+        final start = DateTime(
+            customDateRange.start.year,
+            customDateRange.start.month,
+            customDateRange.start.day);
+        final end = DateTime(
+            customDateRange.end.year,
+            customDateRange.end.month,
+            customDateRange.end.day,
+            23,
+            59,
+            59);
+        return (local.isAfter(start) || local.isAtSameMomentAs(start)) &&
+            (local.isBefore(end) || local.isAtSameMomentAs(end));
+    }
+  }
+
   factory StudentAttendanceRecord.fromJson(Map<String, dynamic> json) {
     final loginRaw = json['login_time'] ?? json['time_in'] ?? json['created_at'];
     final logoutRaw = json['logout_time'] ?? json['time_out'];
@@ -189,6 +261,7 @@ class StudentAttendanceRecord {
 
     return StudentAttendanceRecord(
       id: (json['id'] ?? json['attendance_id'] ?? '').toString(),
+      roomName: (json['room_name'] ?? json['room'] ?? json['lab_name'] ?? json['room_number'] ?? '').toString(),
       studentId: (json['student_id'] ?? json['student_number'] ?? 'N/A').toString(),
       studentName: (json['student_name'] ?? json['full_name'] ?? 'Student User').toString(),
       studentEmail: (json['student_email'] ?? json['email'] ?? '').toString(),
@@ -208,6 +281,7 @@ class StudentAttendanceRecord {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'room_name': roomName,
       'student_id': studentId,
       'student_name': studentName,
       'student_email': studentEmail,
