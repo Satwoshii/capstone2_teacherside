@@ -200,7 +200,8 @@ class _StudentAttendanceLogsScreenState extends State<StudentAttendanceLogsScree
     final currentUserDisplayName = windowsAccount?.displayLabel ?? widget.user.displayName;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
         color: navBg,
         border: Border(bottom: BorderSide(color: navBorder)),

@@ -217,7 +217,8 @@ class _TeacherChatScreenState extends State<TeacherChatScreen> {
   Widget _topBar() {
     final room = widget.user.assignedRoomName ?? 'Unassigned';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
         color: _card.withValues(alpha: _dark ? 0.96 : 0.98),
         border: Border(bottom: BorderSide(color: _border)),
@@ -273,7 +274,7 @@ class _TeacherChatScreenState extends State<TeacherChatScreen> {
             ],
           ),
           const SizedBox(width: 13),
-          Expanded(
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -295,6 +296,7 @@ class _TeacherChatScreenState extends State<TeacherChatScreen> {
               ],
             ),
           ),
+          const Spacer(),
           _iconTile(
             icon: Icons.refresh_rounded,
             tooltip: 'Refresh conversation',

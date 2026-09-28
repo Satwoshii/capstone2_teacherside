@@ -123,6 +123,14 @@ class StudentAttendanceRecord {
     return '${minutes}m';
   }
 
+  String get formattedDate {
+    final dt = loginTime.toLocal();
+    final mm = dt.month.toString().padLeft(2, '0');
+    final dd = dt.day.toString().padLeft(2, '0');
+    final yyyy = dt.year.toString();
+    return '$mm/$dd/$yyyy';
+  }
+
   String get formattedLoginTime {
     final dt = loginTime.toLocal();
     final h = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);

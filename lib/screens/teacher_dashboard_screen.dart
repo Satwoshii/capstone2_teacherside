@@ -13,7 +13,7 @@ import '../utils/value_helpers.dart';
 import '../widgets/theme_toggle_button.dart';
 import 'student_attendance_screen.dart';
 import 'teacher_chat_screen.dart';
-
+ 
 const _teacherProblemOptions = <_TeacherProblemOption>[
   _TeacherProblemOption(
     label: 'Keyboard problem',
@@ -118,6 +118,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Future<(LabOverview, List<FaultReport>)>? _future;
   LabOverview? _latestRoom;
   Timer? _timer;
+  Timer? _clockTimer;
+  DateTime _now = DateTime.now();
   bool _loggingOut = false;
   final _busyReports = <String>{};
   String _historyLogFilter = 'all';
@@ -148,7 +150,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   double _horizontalPagePadding(BuildContext context) {
     if (_isCompact(context)) return 14;
     if (_isMedium(context)) return 20;
-    return 28;
+    return 24;
   }
 
   double _dialogWidth(BuildContext context, double desired) {
@@ -161,11 +163,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     super.initState();
     _refresh();
     _timer = Timer.periodic(const Duration(seconds: 20), (_) => _refresh());
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _clockTimer?.cancel();
     super.dispose();
   }
 
@@ -211,63 +221,63 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     }
   }
 
+  String _formatClock(DateTime dt) {
+    final h = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final m = dt.minute.toString().padLeft(2, '0');
+    final s = dt.second.toString().padLeft(2, '0');
+    return '$h:$m:$s $ampm';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            _ambientBackground(),
-            Column(
-              children: [
-                _topBar(),
-                Expanded(
-                  child: FutureBuilder<(LabOverview, List<FaultReport>)>(
-                    future: _future,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(
-                          child: Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: _card,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: _border),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 20,
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            child: CircularProgressIndicator(
-                              color: _accentAForeground,
-                              strokeWidth: 2.5,
-                            ),
+      body: Stack(
+        children: [
+          _ambientBackground(),
+          Column(
+            children: [
+              _topBar(),
+              Expanded(
+                child: FutureBuilder<(LabOverview, List<FaultReport>)>(
+                  future: _future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: _card,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _border),
                           ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return _errorState(cleanError(snapshot.error!));
-                      }
-                      final data = snapshot.data;
-                      if (data == null) return _errorState('No room data found.');
-                      return _content(data.$1, data.$2);
-                    },
-                  ),
+                          padding: const EdgeInsets.all(16),
+                          child: CircularProgressIndicator(
+                            color: _accentAForeground,
+                            strokeWidth: 2.4,
+                          ),
+                        ),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return _errorState(cleanError(snapshot.error!));
+                    }
+                    final data = snapshot.data;
+                    if (data == null) return _errorState('No room data found.');
+                    return _content(data.$1, data.$2);
+                  },
                 ),
-              ],
-            ),
-            Positioned(
-              left: _isCompact(context) ? 14 : 24,
-              bottom: _isCompact(context) ? 14 : 24,
-              child: const ThemeToggleButton(),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const Positioned(
+            left: 20,
+            bottom: 20,
+            child: ThemeToggleButton(),
+          ),
+        ],
       ),
     );
   }
@@ -277,16 +287,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       child: Stack(
         children: [
           Positioned(
-            top: -200,
-            left: -150,
+            top: -180,
+            left: -120,
             child: Container(
-              width: 580,
-              height: 580,
+              width: 520,
+              height: 520,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    _accentB.withValues(alpha: _dark ? 0.18 : 0.10),
+                    _accentB.withValues(alpha: _dark ? 0.15 : 0.12),
                     Colors.transparent,
                   ],
                 ),
@@ -294,16 +304,16 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             ),
           ),
           Positioned(
-            right: -200,
-            bottom: -250,
+            right: -180,
+            bottom: -220,
             child: Container(
-              width: 680,
-              height: 680,
+              width: 620,
+              height: 620,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    _accentAForeground.withValues(alpha: _dark ? 0.14 : 0.08),
+                    _accentAForeground.withValues(alpha: _dark ? 0.12 : 0.10),
                     Colors.transparent,
                   ],
                 ),
@@ -321,148 +331,218 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final currentUserDisplayName =
         windowsAccount?.displayLabel ?? widget.user.displayName;
 
-    final navBg = _dark ? _card.withValues(alpha: 0.94) : _accentB;
+    final navBg = _dark ? _card.withValues(alpha: 0.96) : _accentB;
     final navFg = _dark ? _text : Colors.white;
     final navSub = _dark ? _sub : Colors.white70;
-    final navBorder = _dark ? _border : Colors.white.withOpacity(0.12);
+    final navBorder = _dark ? _border : Colors.white.withValues(alpha: 0.1);
+    final width = MediaQuery.of(context).size.width;
+    final compact = width < 1250;
+    final showClock = width >= 1000;
 
-    final compact = _isCompact(context);
-
-    final logo = Container(
-      width: compact ? 40 : 46,
-      height: compact ? 40 : 46,
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 24,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        gradient: LinearGradient(
-          colors: [
-            _accentAForeground.withValues(alpha: 0.25),
-            _accentAForeground.withValues(alpha: 0.08),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: _dark
-              ? _accentColor.withValues(alpha: 0.45)
-              : Colors.white.withOpacity(0.35),
-          width: 1.2,
-        ),
-      ),
-      child: Icon(
-        Icons.school_rounded,
-        color: _dark ? _accentAForeground : Colors.white,
-        size: compact ? 22 : 25,
-      ),
-    );
-
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'SysWatch',
-              style: TextStyle(
-                color: navFg,
-                fontSize: compact ? 16 : 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: _accentAForeground.withValues(alpha: 0.20),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'TEACHER',
-                style: TextStyle(
-                  color: _dark ? _accentAForeground : Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Laboratory $room · Monitoring Dashboard',
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: navSub,
-            fontSize: compact ? 11 : 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-
-    final userChip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _dark ? navBorder : Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: _accentAForeground.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_rounded,
-              color: _dark ? _accentAForeground : Colors.white,
-              size: 14,
-            ),
-          ),
-          const SizedBox(width: 8),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: compact ? 120 : 180),
-            child: Text(
-              currentUserDisplayName,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: navFg,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+        color: navBg,
+        border: Border(bottom: BorderSide(color: navBorder)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: _dark ? 0.16 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: navBorder),
+            ),
+            child: Icon(
+              Icons.school_rounded,
+              color: _dark ? _accentAForeground : Colors.white,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'SysWatch',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: navFg,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _accentAForeground.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'TEACHER',
+                        style: TextStyle(
+                          color: _dark ? _accentAForeground : Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Laboratory $room · Monitoring Dashboard',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: navSub, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (showClock) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: navBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.circle, size: 8, color: Color(0xFF10B981)),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatClock(_now),
+                    style: TextStyle(
+                      color: navFg,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Tooltip(
+            message: currentUserDisplayName,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _dark ? _field : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _dark
+                      ? navBorder
+                      : Colors.black.withValues(alpha: 0.1),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.person_rounded,
+                    size: 16,
+                    color: _dark ? _accentAForeground : _accentB,
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      child: Text(
+                        currentUserDisplayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _dark ? navFg : Colors.black87,
+                          fontSize: 12.8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ..._topBarActions(compact),
+        ],
+      ),
     );
+  }
 
-    final actions = <Widget>[
-      if (!compact && _latestRoom != null) ...[
+  List<Widget> _topBarActions(bool compact) {
+    if (compact) {
+      return [
         _gradientButton(
-          label: 'Attendance',
-          icon: Icons.co_present_rounded,
-          onPressed: () => _openAttendance(_latestRoom!),
-        ),
-        const SizedBox(width: 8),
-      ],
-      if (!compact) ...[
-        _gradientButton(
-          label: 'Chat ITSO',
+          label: 'Chat',
           icon: Icons.forum_rounded,
+          onNavbar: true,
           onPressed: _openChat,
         ),
         const SizedBox(width: 8),
-      ],
+        PopupMenuButton<String>(
+          tooltip: 'More actions',
+          color: _card,
+          icon: Icon(
+            Icons.more_vert_rounded,
+            color: _dark ? _sub : Colors.white,
+          ),
+          onSelected: (v) {
+            switch (v) {
+              case 'refresh':
+                _refresh();
+                break;
+              case 'logout':
+                if (!_loggingOut) _logout();
+                break;
+            }
+          },
+          itemBuilder: (_) => [
+            _menuItem('refresh', Icons.refresh_rounded, 'Refresh Dashboard'),
+            _menuItem(
+              'logout',
+              _loggingOut ? Icons.hourglass_top_rounded : Icons.logout_rounded,
+              'Close Teacher App',
+            ),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      _gradientButton(
+        label: 'Chat ITSO',
+        icon: Icons.forum_rounded,
+        onNavbar: true,
+        onPressed: _openChat,
+      ),
+      const SizedBox(width: 8),
       _iconTile(
         icon: Icons.refresh_rounded,
         tooltip: 'Refresh dashboard',
@@ -476,116 +556,18 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         tooltip: 'Close Teacher App',
         onPressed: _loggingOut ? null : _logout,
       ),
-      if (compact) ...[
-        const SizedBox(width: 8),
-        _overflowMenu(navBorder),
-      ],
     ];
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 14 : 24,
-        vertical: compact ? 10 : 14,
-      ),
-      decoration: BoxDecoration(
-        color: navBg,
-        border: Border(bottom: BorderSide(color: navBorder)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: _dark ? 0.25 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: compact
-          ? Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              logo,
-              const SizedBox(width: 10),
-              Expanded(child: titleBlock),
-              ...actions,
-            ],
-          ),
-          const SizedBox(height: 10),
-          userChip,
-        ],
-      )
-          : Row(
-        children: [
-          logo,
-          const SizedBox(width: 14),
-          Expanded(child: titleBlock),
-          const SizedBox(width: 12),
-          userChip,
-          const SizedBox(width: 14),
-          ...actions,
-        ],
-      ),
-    );
   }
 
-  Widget _overflowMenu(Color navBorder) {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: navBorder),
-        ),
-        child: PopupMenuButton<String>(
-          tooltip: 'More actions',
-          icon: Icon(
-            Icons.more_vert_rounded,
-            color: _dark ? _sub : Colors.white70,
-            size: 20,
-          ),
-          color: _card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          onSelected: (value) {
-            if (value == 'attendance' && _latestRoom != null) {
-              _openAttendance(_latestRoom!);
-            } else if (value == 'chat') {
-              _openChat();
-            }
-          },
-          itemBuilder: (context) => [
-            if (_latestRoom != null)
-              PopupMenuItem(
-                value: 'attendance',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.co_present_rounded,
-                      size: 18,
-                      color: _accentAForeground,
-                    ),
-                    const SizedBox(width: 10),
-                    Text('Student Attendance', style: TextStyle(color: _text)),
-                  ],
-                ),
-              ),
-            PopupMenuItem(
-              value: 'chat',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.forum_rounded,
-                    size: 18,
-                    color: _accentAForeground,
-                  ),
-                  const SizedBox(width: 10),
-                  Text('Chat with ITSO', style: TextStyle(color: _text)),
-                ],
-              ),
-            ),
-          ],
-        ),
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: _sub),
+          const SizedBox(width: 10),
+          Text(label, style: TextStyle(color: _text, fontSize: 13)),
+        ],
       ),
     );
   }
@@ -595,7 +577,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     required String tooltip,
     required VoidCallback? onPressed,
   }) {
-    final navBorder = _dark ? _border : Colors.white.withOpacity(0.15);
+    final navBorder = _dark ? _border : Colors.white.withValues(alpha: 0.1);
     return Tooltip(
       message: tooltip,
       child: SizedBox(
@@ -603,7 +585,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         height: 40,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: _dark ? _field : Colors.white.withOpacity(0.15),
+            color: _dark ? _field : Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: navBorder),
           ),
@@ -614,7 +596,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               onTap: onPressed,
               child: Icon(
                 icon,
-                color: _dark ? _text : Colors.white,
+                color: _dark ? _sub : Colors.white70,
                 size: 19,
               ),
             ),
@@ -628,21 +610,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     required String label,
     required IconData icon,
     required VoidCallback? onPressed,
+    bool onNavbar = false,
   }) {
     final disabled = onPressed == null;
+    final useGold = onNavbar && !_dark;
+    final bg = disabled ? _field : (useGold ? _accentA : _accentColor);
+    final fg = disabled
+        ? _sub
+        : (useGold ? _accentB : (_dark ? Colors.black : Colors.white));
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: disabled ? _field : _accentColor,
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: disabled
-            ? null
-            : [
-          BoxShadow(
-            color: _accentColor.withValues(alpha: 0.28),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -650,16 +630,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           borderRadius: BorderRadius.circular(12),
           onTap: onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  size: 17,
-                  color: disabled ? _sub : (_dark ? Colors.black : Colors.white),
-                ),
-                const SizedBox(width: 7),
+                Icon(icon, size: 17, color: fg),
+                const SizedBox(width: 8),
                 Text(
                   label,
                   style: TextStyle(
