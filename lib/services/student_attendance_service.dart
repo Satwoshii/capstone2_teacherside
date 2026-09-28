@@ -171,20 +171,35 @@ class StudentAttendanceService {
   }
 
   String exportCsv({required String roomName}) {
+    return exportCsvForRecords(
+      roomName: roomName,
+      records: _records,
+      timeFilterLabel: 'All Records',
+    );
+  }
+
+  String exportCsvForRecords({
+    required String roomName,
+    required List<StudentAttendanceRecord> records,
+    String timeFilterLabel = 'All Time',
+  }) {
     final buffer = StringBuffer();
     final now = DateTime.now();
     buffer.writeln('# SysWatch Laboratory Student Attendance Report');
     buffer.writeln('# Room: ${_csvCell(roomName)}');
+    buffer.writeln('# Time Range: ${_csvCell(timeFilterLabel)}');
     buffer.writeln('# Date Generated: ${_csvCell(now.toLocal().toString())}');
-    buffer.writeln('PC ID,Student ID,Student Name,Email,Subject,Time In,Time Out,Duration,Status,IP Address,Remarks');
+    buffer.writeln('# Total Exported Records: ${records.length}');
+    buffer.writeln('PC ID,Student ID,Student Name,Email,Subject,Date,Time In,Time Out,Duration,Status,IP Address,Remarks');
 
-    for (final r in _records) {
+    for (final r in records) {
       final line = [
         r.pcId,
         r.studentId,
         r.studentName,
         r.studentEmail,
         r.subject,
+        r.formattedDate,
         r.formattedLoginTime,
         r.formattedLogoutTime,
         r.formattedDuration,
